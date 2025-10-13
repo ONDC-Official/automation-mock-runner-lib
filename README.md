@@ -1,4 +1,4 @@
-# ONDC Automation Mock Runner
+# @ondc/automation-mock-runner
 
 A robust TypeScript library designed for testing and validating ONDC (Open Network for Digital Commerce) transaction flows. This tool helps developers build reliable ONDC integrations by providing a comprehensive framework for generating, validating, and testing API payloads across different transaction scenarios.
 
@@ -7,11 +7,12 @@ A robust TypeScript library designed for testing and validating ONDC (Open Netwo
 When building applications that integrate with the ONDC network, you need to handle complex multi-step transaction flows where each API call depends on data from previous steps. This library provides a structured way to:
 
 - **Generate realistic test payloads** for ONDC APIs (search, select, init, confirm, etc.)
-- **Validate incoming requests** against your business logic
+- **Validate incoming requests** against your business logic with custom validation functions
 - **Check prerequisites** before proceeding with each transaction step
 - **Maintain session state** across the entire transaction flow
+- **Execute code securely** using sandboxed Worker Threads with base64-encoded functions
 
-The core concept is simple: define your transaction flow once, then let the runner handle payload generation, validation, and state management automatically.
+The core concept is simple: define your transaction flow with base64-encoded functions, then let the runner handle payload generation, validation, and state management automatically in a secure environment.
 
 ## Key Features
 
@@ -21,23 +22,27 @@ The core concept is simple: define your transaction flow once, then let the runn
 - Automatic context generation with proper ONDC headers and metadata
 - Session data persistence across transaction steps
 
-### 🧪 Secure Code Execution
+### 🔒 Secure Code Execution
 
-- Safe execution of custom JavaScript functions for payload generation and validation
-- Multiple execution environments: Node.js worker threads, VM sandboxes, or browser workers
+- **Base64-encoded functions** for secure storage and transmission
+- **Sandboxed Worker Threads** with isolated VM contexts
+- **Complete function declarations** required (not just function bodies)
 - Built-in timeout protection and error isolation
+- Memory limits and resource monitoring
 
 ### ✅ Schema Validation
 
-- Zod-based configuration validation
+- Zod-based configuration validation with base64 string validation
 - Runtime type checking for all inputs and outputs
 - Detailed error reporting with line-by-line feedback
+- JSON Schema validation for user inputs
 
 ### 🎯 ONDC-Specific Features
 
 - Built-in support for BAP (Buyer App) and BPP (Seller App) roles
 - Automatic message ID correlation for request-response pairs
 - Version-aware context generation (supports ONDC v1.x and v2.x)
+- Domain-specific helper utilities
 
 ## Installation
 
@@ -47,20 +52,26 @@ npm install @ondc/automation-mock-runner
 
 ## Quick Start
 
-Here's how to set up a basic ONDC search-to-confirm flow:
+Here's how to set up a basic ONDC search flow with base64-encoded functions:
 
 ```typescript
 import { MockRunner } from "@ondc/automation-mock-runner";
+import { MockPlaygroundConfigType } from "@ondc/automation-mock-runner";
+
+// Helper function to encode functions as base64
+function encodeFunction(functionCode: string): string {
+	return MockRunner.encodeBase64(functionCode);
+}
 
 // Define your transaction configuration
-const config = {
+const config: MockPlaygroundConfigType = {
 	meta: {
-		domain: "retail",
+		domain: "ONDC:RET11",
 		version: "1.2.0",
 		flowId: "search-select-init-confirm",
 	},
 	transaction_data: {
-		transaction_id: "uuid-here",
+		transaction_id: "550e8400-e29b-41d4-a716-446655440000",
 		latest_timestamp: new Date().toISOString(),
 		bap_id: "buyer-app.example.com",
 		bap_uri: "https://buyer-app.example.com",
@@ -76,47 +87,75 @@ const config = {
 			unsolicited: false,
 			description: "Search for products in electronics category",
 			mock: {
-				generate: `
-          // Add search intent to the payload
-          defaultPayload.message = {
-            intent: {
-              category: { descriptor: { name: "Electronics" } },
-              location: { country: { code: "IND" }, city: { code: "std:080" } }
-            }
-          };
-          return defaultPayload;
-        `,
-				validate: `
-          if (!targetPayload.message?.catalog?.providers?.length) {
-            return { valid: false, code: 400, description: "No providers found" };
+				generate: encodeFunction(`
+          async function generate(defaultPayload, sessionData) {
+            // Add search intent to the payload
+            defaultPayload.message = {
+              intent: {
+                category: { descriptor: { name: "Electronics" } },
+                location: { country: { code: "IND" }, city: { code: "std:080" } }
+              }
+            };
+            return defaultPayload;
           }
-          return { valid: true, code: 200, description: "Valid catalog response" };
-        `,
-				requirements: `return { valid: true, code: 200, description: "Ready to search" };`,
+        `),
+				validate: encodeFunction(`
+          function validate(targetPayload, sessionData) {
+            if (!targetPayload.message?.catalog?.providers?.length) {
+              return { valid: false, code: 400, description: "No providers found" };
+            }
+            return { valid: true, code: 200, description: "Valid catalog response" };
+          }
+        `),
+				requirements: encodeFunction(`
+          function meetsRequirements(sessionData) {
+            return { valid: true, code: 200, description: "Ready to search" };
+          }
+        `),
 				defaultPayload: { context: {}, message: {} },
 				saveData: {
 					providers: "$.message.catalog.providers",
 				},
-				inputs: {},
+				inputs: {
+					id: "search_inputs",
+					jsonSchema: {
+						type: "object",
+						properties: {
+							category: { type: "string", default: "Electronics" },
+						},
+					},
+				},
 			},
 		},
 	],
 	transaction_history: [],
-	validationLib: "",
-	helperLib: "",
+	validationLib: encodeFunction(`
+    // Shared validation utilities
+    function validateONDCContext(context) {
+      return context && context.domain && context.action && context.message_id;
+    }
+  `),
+	helperLib: encodeFunction(`
+    // Shared helper functions
+    function generateMessageId() {
+      return crypto.randomUUID();
+    }
+  `),
 };
 
 // Initialize the runner
 const runner = new MockRunner(config);
 
 // Generate a search payload
-const searchResult = await runner.runGeneratePayload("search_001", {});
+const searchResult = await runner.runGeneratePayload("search_001", {
+	category: "Electronics",
+});
 console.log("Generated search payload:", searchResult.result);
 
 // Validate a response
 const validationResult = await runner.runValidatePayload(
 	"search_001",
-	responsePayload
+	responsePayload,
 );
 console.log("Validation passed:", validationResult.success);
 ```
@@ -159,14 +198,104 @@ Each step represents one API call in your transaction flow:
   unsolicited: boolean,       // Whether this is an unsolicited call
   description: string,        // Human-readable description
   mock: {
-    generate: string,         // JavaScript code to generate payload
-    validate: string,         // JavaScript code to validate response
-    requirements: string,     // JavaScript code to check prerequisites
+    generate: string,         // Base64-encoded complete function for payload generation
+    validate: string,         // Base64-encoded complete function for response validation
+    requirements: string,     // Base64-encoded complete function for prerequisite checks
     defaultPayload: object,   // Base payload structure
     saveData: object,         // JSONPath expressions to save data
     inputs: object           // Input schema for user data
   }
 }
+```
+
+## 🔑 Base64 Function Requirements
+
+**IMPORTANT**: All mock functions must be:
+
+1. **Complete function declarations** with proper function names:
+   - `generate` functions: `async function generate(defaultPayload, sessionData) { ... }`
+   - `validate` functions: `function validate(targetPayload, sessionData) { ... }`
+   - `requirements` functions: `function meetsRequirements(sessionData) { ... }`
+
+2. **Base64 encoded** using `MockRunner.encodeBase64()` utility
+
+3. **Properly formatted** with return statements and error handling
+
+### Function Signatures
+
+Each function type has a specific signature that must be followed:
+
+#### Generate Functions
+
+```typescript
+async function generate(defaultPayload: any, sessionData: any): Promise<any> {
+	// Parameters:
+	// - defaultPayload: Base payload with context already populated
+	// - sessionData: Contains user_inputs and data from previous steps
+
+	// Must return the complete payload to be sent
+	return defaultPayload;
+}
+```
+
+#### Validate Functions
+
+```typescript
+function validate(targetPayload: any, sessionData: any): ValidationResult {
+	// Parameters:
+	// - targetPayload: The incoming payload to validate
+	// - sessionData: Data from previous steps
+
+	// Must return validation result object
+	return {
+		valid: true,
+		code: 200,
+		description: "Validation passed",
+	};
+}
+```
+
+#### Requirements Functions
+
+```typescript
+function meetsRequirements(sessionData: any): RequirementResult {
+	// Parameters:
+	// - sessionData: Data from previous steps
+
+	// Must return requirement check result
+	return {
+		valid: true,
+		code: 200,
+		description: "Requirements met",
+	};
+}
+```
+
+### Example Function Creation:
+
+```typescript
+// Create a complete function
+const generateFunction = `
+  async function generate(defaultPayload, sessionData) {
+    // Your logic here
+    defaultPayload.message = { 
+      intent: { category: { descriptor: { name: "Electronics" } } }
+    };
+    return defaultPayload;
+  }
+`;
+
+// Encode it as base64
+const encodedFunction = MockRunner.encodeBase64(generateFunction);
+
+// Use in configuration
+const step = {
+	// ...other properties...
+	mock: {
+		generate: encodedFunction,
+		// ...other mock properties...
+	},
+};
 ```
 
 ## Advanced Usage
@@ -211,40 +340,51 @@ const steps = [
 ### Custom Validation Logic
 
 ```typescript
-const validatePayload = `
-  // Check if order total matches expected amount
-  const expectedTotal = sessionData.calculatedTotal;
-  const actualTotal = targetPayload.message.order.quote.total;
-  
-  if (Math.abs(expectedTotal - actualTotal) > 0.01) {
-    return {
-      valid: false,
-      code: 400, 
-      description: \`Total mismatch: expected \${expectedTotal}, got \${actualTotal}\`
-    };
+// Create complete validation function
+const validateFunction = `
+  function validate(targetPayload, sessionData) {
+    // Check if order total matches expected amount
+    const expectedTotal = sessionData.calculatedTotal;
+    const actualTotal = targetPayload.message.order.quote.total;
+    
+    if (Math.abs(expectedTotal - actualTotal) > 0.01) {
+      return {
+        valid: false,
+        code: 400, 
+        description: \`Total mismatch: expected \${expectedTotal}, got \${actualTotal}\`
+      };
+    }
+    
+    return { valid: true, code: 200, description: "Order total validated" };
   }
-  
-  return { valid: true, code: 200, description: "Order total validated" };
 `;
+
+// Encode for use in configuration
+const encodedValidateFunction = MockRunner.encodeBase64(validateFunction);
 ```
 
 ### User Input Handling
 
 ```typescript
+// Create function that uses user inputs
+const generateWithInputs = `
+  async function generate(defaultPayload, sessionData) {
+    // Access user inputs
+    const { email, deliveryAddress } = sessionData.user_inputs;
+    
+    defaultPayload.message.order.billing = {
+      email: email,
+      address: deliveryAddress
+    };
+    
+    return defaultPayload;
+  }
+`;
+
 const stepWithInputs = {
 	// ... other config
 	mock: {
-		generate: `
-      // Access user inputs
-      const { email, deliveryAddress } = sessionData.user_inputs;
-      
-      defaultPayload.message.order.billing = {
-        email: email,
-        address: deliveryAddress
-      };
-      
-      return defaultPayload;
-    `,
+		generate: MockRunner.encodeBase64(generateWithInputs),
 		inputs: {
 			id: "user_details",
 			jsonSchema: {
@@ -297,7 +437,7 @@ Validates an incoming payload against the specified action step.
 ```typescript
 const result = await runner.runValidatePayload(
 	"on_search_001",
-	responsePayload
+	responsePayload,
 );
 ```
 
@@ -309,10 +449,30 @@ const result = await runner.runMeetRequirements("select_001", {});
 ```
 
 **`getDefaultStep(api: string, actionId: string)`**
-Creates a new step configuration with sensible defaults.
+Creates a new step configuration with sensible defaults and base64-encoded template functions.
 
 ```typescript
 const newStep = runner.getDefaultStep("search", "search_002");
+// Returns a step with properly encoded template functions
+```
+
+**`MockRunner.encodeBase64(functionString: string)`**
+Static utility to encode functions as base64.
+
+```typescript
+const encodedFunction = MockRunner.encodeBase64(`
+  async function generate(defaultPayload, sessionData) {
+    // Your function logic here
+    return defaultPayload;
+  }
+`);
+```
+
+**`MockRunner.decodeBase64(encodedString: string)`**
+Static utility to decode base64-encoded functions (used internally).
+
+```typescript
+const decodedFunction = MockRunner.decodeBase64(encodedFunction);
 ```
 
 ## Error Handling
@@ -349,10 +509,13 @@ npm run test:coverage # Generate coverage report
 
 ## Security Considerations
 
-- All user code runs in isolated environments (worker threads or VM sandboxes)
-- Dangerous functions like `eval`, `require`, and file system access are blocked
-- Execution timeouts prevent infinite loops
-- Memory limits prevent resource exhaustion
+- **Base64 encoding** prevents code injection through configuration
+- **Complete function declarations** required - no arbitrary code execution
+- **Sandboxed Worker Threads** with isolated VM contexts
+- **Restricted global access** - dangerous functions like `eval`, `require`, and file system access are blocked
+- **Execution timeouts** prevent infinite loops and hanging processes
+- **Memory limits** prevent resource exhaustion
+- **Input validation** using Zod schemas for all configuration data
 
 ## Contributing
 
