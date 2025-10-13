@@ -12,6 +12,7 @@ import jsonpath from "jsonpath";
 import { getFunctionSchema } from "./constants/function-registry";
 import { ExecutionResult } from "./types/execution-results";
 import { v4 as uuidv4 } from "uuid";
+import { base64 } from "zod";
 
 export class MockRunner {
 	private config: MockPlaygroundConfigType;
@@ -94,10 +95,11 @@ export class MockRunner {
 			defaultPayload.context = context;
 
 			const schema = getFunctionSchema("generate");
-			const result = await this.runner.execute(step.mock.generate, schema, [
-				defaultPayload,
-				sessionData,
-			]);
+			const result = await this.runner.execute(
+				MockRunner.decodeBase64(step.mock.generate),
+				schema,
+				[defaultPayload, sessionData],
+			);
 
 			const executionTime = Date.now() - startTime;
 			this.logger.logExecution(executionId, "Payload generation completed", {
@@ -145,10 +147,11 @@ export class MockRunner {
 			);
 			const schema = getFunctionSchema("validate");
 			const sessionData = this.getSessionDataUpToStep(index, this.config);
-			const result = await this.runner.execute(step.mock.validate, schema, [
-				targetPayload,
-				sessionData,
-			]);
+			const result = await this.runner.execute(
+				MockRunner.decodeBase64(step.mock.validate),
+				schema,
+				[targetPayload, sessionData],
+			);
 			return result;
 		} catch (error) {
 			return {
@@ -175,10 +178,11 @@ export class MockRunner {
 			);
 			const schema = getFunctionSchema("meetsRequirements");
 			const sessionData = this.getSessionDataUpToStep(index, this.config);
-			const result = await this.runner.execute(step.mock.requirements, schema, [
-				targetPayload,
-				sessionData,
-			]);
+			const result = await this.runner.execute(
+				MockRunner.decodeBase64(step.mock.requirements),
+				schema,
+				[targetPayload, sessionData],
+			);
 			return result;
 		} catch (error) {
 			return {
@@ -206,14 +210,20 @@ export class MockRunner {
 			unsolicited: false,
 			description: "please add relevant description",
 			mock: {
-				generate: getFunctionSchema("generate").template(
-					getFunctionSchema("generate").defaultBody,
+				generate: MockRunner.encodeBase64(
+					getFunctionSchema("generate").template(
+						getFunctionSchema("generate").defaultBody,
+					),
 				),
-				validate: getFunctionSchema("validate").template(
-					getFunctionSchema("validate").defaultBody,
+				validate: MockRunner.encodeBase64(
+					getFunctionSchema("validate").template(
+						getFunctionSchema("validate").defaultBody,
+					),
 				),
-				requirements: getFunctionSchema("meetsRequirements").template(
-					getFunctionSchema("meetsRequirements").defaultBody,
+				requirements: MockRunner.encodeBase64(
+					getFunctionSchema("meetsRequirements").template(
+						getFunctionSchema("meetsRequirements").defaultBody,
+					),
 				),
 				defaultPayload: {
 					context: this.generateContext(actionId, api),
@@ -404,5 +414,17 @@ export class MockRunner {
 		});
 
 		return sessionData;
+	}
+
+	public static encodeBase64(input: string): string {
+		const bytes = new TextEncoder().encode(input);
+		return btoa(String.fromCharCode(...bytes));
+	}
+	public static decodeBase64(encoded: string): string {
+		const binaryString = atob(encoded);
+		const bytes = new Uint8Array(
+			[...binaryString].map((char) => char.charCodeAt(0)),
+		);
+		return new TextDecoder().decode(bytes);
 	}
 }

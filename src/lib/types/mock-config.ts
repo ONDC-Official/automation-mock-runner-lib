@@ -19,9 +19,9 @@ export const TransactionDataSchema = z.object({
 });
 
 export const MockConfigSchema = z.object({
-	generate: z.string(),
-	validate: z.string(),
-	requirements: z.string(),
+	generate: z.base64(),
+	validate: z.base64(),
+	requirements: z.base64(),
 	defaultPayload: z.any(),
 	saveData: z.record(z.string(), z.string()),
 	inputs: z.object({

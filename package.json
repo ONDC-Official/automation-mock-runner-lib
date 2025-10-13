@@ -75,6 +75,7 @@
 	"dependencies": {
 		"acorn": "^8.15.0",
 		"acorn-walk": "^8.3.4",
+		"base-64": "^1.0.0",
 		"jsonpath": "^1.1.1",
 		"uuid": "^10.0.0",
 		"zod": "^4.1.12"
