@@ -122,7 +122,7 @@ export class NodeRunner implements BaseCodeRunner {
 	async execute(
 		functionBody: string,
 		schema: FunctionSchema,
-		args: any[]
+		args: any[],
 	): Promise<ExecutionResult> {
 		const validation = CodeValidator.validate(functionBody, schema);
 		if (!validation.isValid || !validation.wrappedCode) {

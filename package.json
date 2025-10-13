@@ -1,13 +1,14 @@
 {
 	"name": "@ondc/automation-mock-runner",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"description": "A TypeScript library for ONDC automation mock runner",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"files": [
 		"dist",
 		"README.md",
-		"LICENSE"
+		"LICENSE",
+		"public"
 	],
 	"scripts": {
 		"build": "npm run clean && tsc",
