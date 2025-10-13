@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 export function createInitialMockConfig(
 	domain: string,
 	version: string,
-	flowId: string
+	flowId: string,
 ): MockPlaygroundConfigType {
 	return {
 		meta: {
