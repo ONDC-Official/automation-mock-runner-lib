@@ -47,12 +47,12 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/ondc-org/automation-mock-runner"
+		"url": "https://github.com/ONDC-Official/automation-mock-runner-lib.git"
 	},
 	"bugs": {
-		"url": "https://github.com/ondc-org/automation-mock-runner/issues"
+		"url": "https://github.com/ONDC-Official/automation-mock-runner-lib/issues"
 	},
-	"homepage": "https://github.com/ondc-org/automation-mock-runner#readme",
+	"homepage": "https://github.com/ONDC-Official/automation-mock-runner-lib#readme",
 	"devDependencies": {
 		"@types/jest": "^30.0.0",
 		"@types/jsonpath": "^0.2.4",
