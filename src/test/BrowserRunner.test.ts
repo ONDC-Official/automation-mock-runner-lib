@@ -55,7 +55,6 @@ describe("BrowserRunner", () => {
 
 			expect(result.success).toBe(true);
 			expect(result.result).toBeDefined();
-			console.log(result.result, "result");
 			expect(result.result.message.test).toBe("browser-execution");
 			expect(result.timestamp).toBeDefined();
 			expect(typeof result.executionTime).toBe("number");
@@ -81,21 +80,21 @@ describe("BrowserRunner", () => {
 			expect(result.result.code).toBe(200);
 		});
 
-		// 	it("should execute requirements function", async () => {
-		// 		const functionCode = `
-		//     function meetsRequirements(sessionData) {
-		//       return { valid: true, code: 200, description: 'Requirements met' };
-		//     }
-		//   `;
+		it("should execute requirements function", async () => {
+			const functionCode = `
+		    function meetsRequirements(sessionData) {
+		      return { valid: true, code: 200, description: 'Requirements met' };
+		    }
+		  `;
 
-		// 		const schema = getFunctionSchema("meetsRequirements");
-		// 		const args = [{}];
+			const schema = getFunctionSchema("meetsRequirements");
+			const args = [{}];
 
-		// 		const result = await browserRunner.execute(functionCode, schema, args);
+			const result = await browserRunner.execute(functionCode, schema, args);
 
-		// 		expect(result.success).toBe(true);
-		// 		expect(result.result.valid).toBe(true);
-		// 	});
+			expect(result.success).toBe(true);
+			expect(result.result.valid).toBe(true);
+		});
 	});
 
 	// describe("Error Handling", () => {
