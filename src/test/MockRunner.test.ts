@@ -159,12 +159,12 @@ describe("MockRunner", () => {
 
 	describe("Session Data Management", () => {
 		it("should extract session data correctly", () => {
-			const sessionData = mockRunner.getSessionDataUpToStep(0, mockConfig);
+			const sessionData = mockRunner.getSessionDataUpToStep(0);
 			expect(sessionData).toEqual({});
 		});
 
 		it("should handle invalid step indices", () => {
-			const sessionData = mockRunner.getSessionDataUpToStep(-1, mockConfig);
+			const sessionData = mockRunner.getSessionDataUpToStep(-1);
 			expect(sessionData).toEqual({});
 		});
 	});
