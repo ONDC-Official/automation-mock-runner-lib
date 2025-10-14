@@ -12,34 +12,38 @@ import jsonpath from "jsonpath";
 import { getFunctionSchema } from "./constants/function-registry";
 import { ExecutionResult } from "./types/execution-results";
 import { v4 as uuidv4 } from "uuid";
-import { base64 } from "zod";
 
 export class MockRunner {
 	private config: MockPlaygroundConfigType;
-	private runner: BaseCodeRunner;
+	private runner: BaseCodeRunner | undefined;
 	private logger: Logger;
 
-	constructor(config: MockPlaygroundConfigType) {
+	constructor(
+		config: MockPlaygroundConfigType,
+		skipValidation: boolean = false,
+	) {
 		this.logger = Logger.getInstance();
 
-		// Validate config on construction
-		const validation = validateConfigWithErrors(config);
-		if (!validation.success) {
-			const errorMessages =
-				validation.errors?.map(
-					(err) => `${err.path.join(".")}: ${err.message}`,
-				) || [];
-			this.logger.error("Invalid configuration provided", {
-				errors: errorMessages,
-			});
-			throw new ConfigurationError(
-				`Configuration validation failed: ${errorMessages.join(", ")}`,
-				{ errors: errorMessages },
-			);
+		if (!skipValidation) {
+			// Validate config on construction
+			const validation = validateConfigWithErrors(config);
+			if (!validation.success) {
+				const errorMessages =
+					validation.errors?.map(
+						(err) => `${err.path.join(".")}: ${err.message}`,
+					) || [];
+				this.logger.error("Invalid configuration provided", {
+					errors: errorMessages,
+				});
+				throw new ConfigurationError(
+					`Configuration validation failed: ${errorMessages.join(", ")}`,
+					{ errors: errorMessages },
+				);
+			}
+		} else {
+			this.logger.warn("Skipping configuration validation as per request");
 		}
-
 		this.config = config;
-		this.runner = RunnerFactory.createRunner();
 
 		this.logger.info("MockRunner initialized successfully", {
 			domain: config.meta.domain,
@@ -48,6 +52,14 @@ export class MockRunner {
 			stepsCount: config.steps.length,
 		});
 	}
+
+	public getRunnerInstance() {
+		if (!this.runner) {
+			this.runner = RunnerFactory.createRunner();
+		}
+		return this.runner;
+	}
+
 	public validateConfig() {
 		const res = validateConfigWithErrors(this.config);
 		return res;
@@ -95,7 +107,8 @@ export class MockRunner {
 			defaultPayload.context = context;
 
 			const schema = getFunctionSchema("generate");
-			const result = await this.runner.execute(
+
+			const result = await this.getRunnerInstance().execute(
 				MockRunner.decodeBase64(step.mock.generate),
 				schema,
 				[defaultPayload, sessionData],
@@ -147,7 +160,8 @@ export class MockRunner {
 			);
 			const schema = getFunctionSchema("validate");
 			const sessionData = this.getSessionDataUpToStep(index, this.config);
-			const result = await this.runner.execute(
+
+			const result = await this.getRunnerInstance().execute(
 				MockRunner.decodeBase64(step.mock.validate),
 				schema,
 				[targetPayload, sessionData],
@@ -178,7 +192,8 @@ export class MockRunner {
 			);
 			const schema = getFunctionSchema("meetsRequirements");
 			const sessionData = this.getSessionDataUpToStep(index, this.config);
-			const result = await this.runner.execute(
+
+			const result = await this.getRunnerInstance().execute(
 				MockRunner.decodeBase64(step.mock.requirements),
 				schema,
 				[targetPayload, sessionData],
