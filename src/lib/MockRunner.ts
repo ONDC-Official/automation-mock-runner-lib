@@ -91,7 +91,7 @@ export class MockRunner {
 			const defaultPayload = JSON.parse(
 				JSON.stringify(step.mock.defaultPayload),
 			);
-			const sessionData = this.getSessionDataUpToStep(index, this.config);
+			const sessionData = this.getSessionDataUpToStep(index);
 
 			// Validate inputs against schema if provided
 			if (step.mock.inputs?.jsonSchema && Object.keys(inputs).length > 0) {
@@ -159,7 +159,7 @@ export class MockRunner {
 				(s) => s.action_id === actionId,
 			);
 			const schema = getFunctionSchema("validate");
-			const sessionData = this.getSessionDataUpToStep(index, this.config);
+			const sessionData = this.getSessionDataUpToStep(index);
 
 			const result = await this.getRunnerInstance().execute(
 				MockRunner.decodeBase64(step.mock.validate),
@@ -191,7 +191,7 @@ export class MockRunner {
 				(s) => s.action_id === actionId,
 			);
 			const schema = getFunctionSchema("meetsRequirements");
-			const sessionData = this.getSessionDataUpToStep(index, this.config);
+			const sessionData = this.getSessionDataUpToStep(index);
 
 			const result = await this.getRunnerInstance().execute(
 				MockRunner.decodeBase64(step.mock.requirements),
@@ -344,10 +344,8 @@ export class MockRunner {
 			},
 		};
 	}
-	public getSessionDataUpToStep(
-		index: number,
-		config: MockPlaygroundConfigType,
-	): Record<string, any> {
+	public getSessionDataUpToStep(index: number): Record<string, any> {
+		const config = this.config;
 		if (index < 0 || index > config.steps.length) {
 			this.logger.warn("Invalid step index for session data", {
 				index,
