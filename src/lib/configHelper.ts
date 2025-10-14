@@ -26,79 +26,39 @@ export function createInitialMockConfig(
 	};
 }
 
-// export function getDefaultStep(
-// 	action: string,
-// 	action_id: string,
-// 	owner: "BAP" | "BPP",
-// 	responseFor: string | null = null,
-// 	unsolicited = false,
-// 	config: MockPlaygroundConfigType
-// ): MockPlaygroundConfigType["steps"][0] {
-// 	return {
-// 		api: action,
-// 		action_id: action_id,
-// 		owner: owner,
-// 		responseFor: responseFor,
-// 		unsolicited: unsolicited,
-// 		description: "",
-// 		mock: {
-// 			generate: getFormattedContent("generate"),
-// 			validate: getFormattedContent("validate"),
-// 			requirements: getFormattedContent("requirements"),
-// 			defaultPayload: JSON.stringify(
-// 				{
-// 					context: getnerateContext(config, action, responseFor),
-// 					message: {},
-// 				},
-// 				null,
-// 				2
-// 			),
-// 			saveData: {
-// 				message_id: "$.context.message_id",
-// 				latestTimestamp: "$.context.timestamp",
-// 			},
-// 			inputs: JSON.stringify(
-// 				{
-// 					id: "ExampleInputId",
-// 					jsonSchema: {
-// 						$schema: "http://json-schema.org/draft-07/schema#",
-// 						type: "object",
-// 						properties: {
-// 							email: {
-// 								type: "string",
-// 								format: "email",
-// 								minLength: 5,
-// 								maxLength: 50,
-// 								description: "User's email address",
-// 							},
-// 							age: {
-// 								type: "integer",
-// 								minimum: 18,
-// 								maximum: 120,
-// 								description: "User's age",
-// 							},
-// 							password: {
-// 								type: "string",
-// 								minLength: 8,
-// 								pattern: "^(?=.*[A-Z])(?=.*[0-9]).+$",
-// 								description: "Must contain uppercase and number",
-// 							},
-// 							website: {
-// 								type: "string",
-// 								format: "uri",
-// 							},
-// 							country: {
-// 								type: "string",
-// 								enum: ["US", "UK", "CA", "AU"],
-// 							},
-// 						},
-// 						required: ["email", "password"],
-// 						additionalProperties: false,
-// 					},
-// 				},
-// 				null,
-// 				2
-// 			),
-// 		},
-// 	};
-// }
+export function convertToFlowConfig(config: MockPlaygroundConfigType) {
+	const flowConfig: any = {};
+	flowConfig.id = config.meta.flowId;
+	flowConfig.description = "";
+	flowConfig.sequence = [];
+	let index = 0;
+	for (const step of config.steps) {
+		const pair =
+			config.steps.find((s) => s.responseFor === step.action_id)?.action_id ||
+			null;
+		const flowStep: any = {
+			key: step.action_id,
+			type: step.api,
+			owner: step.owner,
+			description: step.description || "",
+			expect: index === 0 ? true : false,
+			unsolicited: step.unsolicited,
+			pair: pair,
+		};
+
+		if (
+			step.mock.inputs !== undefined &&
+			step.mock.inputs !== null &&
+			Object.keys(step.mock.inputs).length > 0
+		) {
+			flowStep.input = {
+				name: step.mock.inputs.id,
+				schema: step.mock.inputs.jsonSchema,
+			};
+		}
+
+		flowConfig.sequence.push(flowStep);
+		index++;
+	}
+	return flowConfig;
+}
