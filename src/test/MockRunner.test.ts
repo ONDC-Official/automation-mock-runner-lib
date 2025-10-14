@@ -81,6 +81,13 @@ describe("MockRunner", () => {
 			expect(result.success).toBe(true);
 			expect(result.result).toBeDefined();
 			expect(result.timestamp).toBeDefined();
+			expect(result.result.context).toBeDefined();
+			expect(result.result.context.transaction_id).toBe(
+				mockConfig.transaction_data.transaction_id,
+			);
+			expect(result.result.context.message_id).toBeDefined();
+			expect(result.result.context.timestamp).toBeDefined();
+			expect(result.result.message).toBeDefined();
 			expect(typeof result.executionTime).toBe("number");
 		});
 

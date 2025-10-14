@@ -118,6 +118,7 @@ export class MockRunner {
 			this.logger.logExecution(executionId, "Payload generation completed", {
 				actionId,
 				success: result.success,
+				output: result.result,
 				executionTime,
 			});
 

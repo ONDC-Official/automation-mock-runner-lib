@@ -1,0 +1,22 @@
+{
+	"name": "@ondc/automation-mock-runner-browser-test",
+	"version": "0.0.1",
+	"private": true,
+	"description": "Browser testing setup for MockRunner",
+	"scripts": {
+		"build:browser": "webpack --mode=production",
+		"test:browser": "npm run build:browser && http-server dist -p 8080 -o",
+		"test:playwright": "playwright test",
+		"test:puppeteer": "jest --config=jest.browser.config.js"
+	},
+	"devDependencies": {
+		"@playwright/test": "^1.40.0",
+		"@types/puppeteer": "^7.0.4",
+		"html-webpack-plugin": "^5.5.0",
+		"http-server": "^14.1.1",
+		"playwright": "^1.40.0",
+		"puppeteer": "^21.5.0",
+		"webpack": "^5.89.0",
+		"webpack-cli": "^5.1.4"
+	}
+}
