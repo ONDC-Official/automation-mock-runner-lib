@@ -147,6 +147,85 @@ export class MockRunner {
 			};
 		}
 	}
+
+	public async runGeneratePayloadWithSession(
+		actionId: string,
+		sessionData: any,
+	) {
+		const executionId = this.logger.createExecutionContext(actionId);
+		const startTime = Date.now();
+		try {
+			this.logger.logExecution(
+				executionId,
+				"Starting payload generation with session data",
+				{
+					actionId,
+					sessionKeys: Object.keys(sessionData),
+				},
+			);
+
+			const step = this.config.steps.find((s) => s.action_id === actionId);
+			if (!step) {
+				const availableActions = this.config.steps.map((s) => s.action_id);
+				throw new ActionNotFoundError(actionId, availableActions);
+			}
+
+			const index = this.config.steps.findIndex(
+				(s) => s.action_id === actionId,
+			);
+
+			// Deep clone to avoid mutations
+			const defaultPayload = JSON.parse(
+				JSON.stringify(step.mock.defaultPayload),
+			);
+
+			const context = this.generateContext(step.action_id, step.api);
+			defaultPayload.context = context;
+			const schema = getFunctionSchema("generate");
+
+			const result = await this.getRunnerInstance().execute(
+				MockRunner.decodeBase64(step.mock.generate),
+				schema,
+				[defaultPayload, sessionData],
+			);
+
+			const executionTime = Date.now() - startTime;
+			this.logger.logExecution(
+				executionId,
+				"Payload generation with session data completed",
+				{
+					actionId,
+					success: result.success,
+					output: result.result,
+					executionTime,
+				},
+			);
+
+			return result;
+		} catch (error) {
+			const executionTime = Date.now() - startTime;
+			this.logger.error(
+				"Payload generation with session data failed",
+				{ actionId, executionTime },
+				error as Error,
+			);
+
+			return {
+				timestamp: new Date().toISOString(),
+				success: false,
+				error: {
+					name:
+						error instanceof Error
+							? error.constructor.name
+							: "PayloadGenerationError",
+					message: (error as Error).message || "Unknown error",
+				},
+				logs: [],
+				executionTime,
+				validation: { isValid: false, errors: [], warnings: [] },
+			};
+		}
+	}
 	public async runValidatePayload(
 		actionId: string,
 		targetPayload: any,
@@ -182,7 +261,41 @@ export class MockRunner {
 			};
 		}
 	}
-	public async runMeetRequirements(actionId: string, targetPayload: any) {
+
+	public async runValidatePayloadWithSession(
+		actionId: string,
+		targetPayload: any,
+		sessionData: any,
+	) {
+		try {
+			const step = this.config.steps.find((s) => s.action_id === actionId);
+			if (!step) {
+				throw new Error(`Action step with ID ${actionId} not found.`);
+			}
+			const schema = getFunctionSchema("validate");
+
+			const result = await this.getRunnerInstance().execute(
+				MockRunner.decodeBase64(step.mock.validate),
+				schema,
+				[targetPayload, sessionData],
+			);
+			return result;
+		} catch (error) {
+			return {
+				timestamp: new Date().toISOString(),
+				success: false,
+				error: {
+					name: "PayloadValidationError",
+					message: (error as Error).message || "Unknown error",
+				},
+				logs: [],
+				executionTime: 0,
+				validation: { isValid: false, errors: [], warnings: [] },
+			};
+		}
+	}
+
+	public async runMeetRequirements(actionId: string) {
 		try {
 			const step = this.config.steps.find((s) => s.action_id === actionId);
 			if (!step) {
@@ -197,7 +310,7 @@ export class MockRunner {
 			const result = await this.getRunnerInstance().execute(
 				MockRunner.decodeBase64(step.mock.requirements),
 				schema,
-				[targetPayload, sessionData],
+				[sessionData],
 			);
 			return result;
 		} catch (error) {
@@ -214,6 +327,39 @@ export class MockRunner {
 			};
 		}
 	}
+
+	public async runMeetRequirementsWithSession(
+		actionId: string,
+		sessionData: any,
+	) {
+		try {
+			const step = this.config.steps.find((s) => s.action_id === actionId);
+			if (!step) {
+				throw new Error(`Action step with ID ${actionId} not found.`);
+			}
+			const schema = getFunctionSchema("meetsRequirements");
+
+			const result = await this.getRunnerInstance().execute(
+				MockRunner.decodeBase64(step.mock.requirements),
+				schema,
+				[sessionData],
+			);
+			return result;
+		} catch (error) {
+			return {
+				timestamp: new Date().toISOString(),
+				success: false,
+				error: {
+					name: "MeetRequirementsError",
+					message: (error as Error).message || "Unknown error",
+				},
+				logs: [],
+				executionTime: 0,
+				validation: { isValid: false, errors: [], warnings: [] },
+			};
+		}
+	}
+
 	public getDefaultStep(
 		api: string,
 		actionId: string,

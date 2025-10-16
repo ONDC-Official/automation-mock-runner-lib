@@ -345,10 +345,8 @@ async function runONDCExample() {
 
 		// Check requirements for select step
 		console.log("\n🔍 Checking requirements for select step...");
-		const selectRequirements = await updatedRunner.runMeetRequirements(
-			"select_item",
-			{},
-		);
+		const selectRequirements =
+			await updatedRunner.runMeetRequirements("select_item");
 		if (selectRequirements.success && selectRequirements.result?.valid) {
 			console.log("✅ Requirements met for selection!");
 			console.log("📋 Requirement check:", selectRequirements.result);
