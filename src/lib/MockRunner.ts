@@ -179,7 +179,11 @@ export class MockRunner {
 				JSON.stringify(step.mock.defaultPayload),
 			);
 
-			const context = this.generateContext(step.action_id, step.api);
+			const context = this.generateContext(
+				step.action_id,
+				step.api,
+				sessionData,
+			);
 			defaultPayload.context = context;
 			const schema = getFunctionSchema("generate");
 
@@ -392,6 +396,7 @@ export class MockRunner {
 					message: {},
 				},
 				saveData: {
+					transactionId: "$.context.transaction_id",
 					latestMessage_id: "$.context.message_id",
 					latestTimestamp: "$.context.timestamp",
 					bapId: "$.context.bap_id",
@@ -440,7 +445,7 @@ export class MockRunner {
 			},
 		};
 	}
-	public generateContext(actionId: string, action: string) {
+	public generateContext(actionId: string, action: string, sessionData?: any) {
 		let step = this.config.steps.find((s) => s.action_id === actionId);
 		if (!step) {
 			step = undefined;
@@ -448,18 +453,24 @@ export class MockRunner {
 		const responseFor = step?.responseFor;
 		let messageId = uuidv4();
 		if (responseFor) {
-			const responsePayload = this.config.transaction_history.find(
-				(item) => item.action_id === responseFor,
-			)?.payload;
-			if (responsePayload.context?.message_id) {
-				messageId = responsePayload.context.message_id;
+			if (sessionData?.latestMessage_id) {
+				messageId = sessionData.latestMessage_id;
+			} else {
+				const responsePayload = this.config.transaction_history.find(
+					(item) => item.action_id === responseFor,
+				)?.payload;
+				if (responsePayload.context?.message_id) {
+					messageId = responsePayload.context.message_id;
+				}
 			}
 		}
 		const baseContext: any = {
 			domain: this.config.meta.domain,
 			action: action,
 			timestamp: new Date().toISOString(),
-			transaction_id: this.config.transaction_data.transaction_id,
+			transaction_id:
+				sessionData?.transaction_id ||
+				this.config.transaction_data.transaction_id,
 			message_id: messageId,
 			bap_id: this.config.transaction_data.bap_id || "",
 			bap_uri: this.config.transaction_data.bap_uri || "",
