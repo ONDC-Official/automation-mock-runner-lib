@@ -51,10 +51,12 @@ export function convertToFlowConfig(config: MockPlaygroundConfigType) {
 			step.mock.inputs !== null &&
 			Object.keys(step.mock.inputs).length > 0
 		) {
-			flowStep.input = {
-				name: step.mock.inputs.id,
-				schema: step.mock.inputs.jsonSchema,
-			};
+			flowStep.input = [
+				{
+					name: step.mock.inputs.id,
+					schema: step.mock.inputs.jsonSchema,
+				},
+			];
 		}
 
 		flowConfig.sequence.push(flowStep);

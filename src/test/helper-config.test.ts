@@ -628,27 +628,29 @@ describe("configHelper", () => {
 				(s: any) => s.key === "on_search_test",
 			);
 
-			expect(stepWithInputs.input).toEqual({
-				name: "ExampleInputId",
-				schema: {
-					$schema: "http://json-schema.org/draft-07/schema#",
-					type: "object",
-					properties: {
-						item_id: {
-							type: "string",
-							description: "item id",
+			expect(stepWithInputs.input).toEqual([
+				{
+					name: "ExampleInputId",
+					schema: {
+						$schema: "http://json-schema.org/draft-07/schema#",
+						type: "object",
+						properties: {
+							item_id: {
+								type: "string",
+								description: "item id",
+							},
+							item_count: {
+								type: "integer",
+								minimum: 0,
+								maximum: 12,
+								description: "item count",
+							},
+							required: ["item_id", "item_count"],
+							additionalProperties: false,
 						},
-						item_count: {
-							type: "integer",
-							minimum: 0,
-							maximum: 12,
-							description: "item count",
-						},
-						required: ["item_id", "item_count"],
-						additionalProperties: false,
 					},
 				},
-			});
+			]);
 		});
 
 		it("should handle steps without inputs", () => {
@@ -776,8 +778,10 @@ describe("configHelper", () => {
 			};
 
 			const result = convertToFlowConfig(configWithComplexInputs);
-			expect(result.sequence[0].input.name).toBe("ComplexInputId");
-			expect(result.sequence[0].input.schema.properties.nested).toBeDefined();
+			expect(result.sequence[0].input[0].name).toBe("ComplexInputId");
+			expect(
+				result.sequence[0].input[0].schema.properties.nested,
+			).toBeDefined();
 		});
 	});
 });
