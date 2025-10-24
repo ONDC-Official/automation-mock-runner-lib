@@ -46,7 +46,7 @@ export const FUNCTION_REGISTRY: Record<string, FunctionSchema> = {
 			description: "The generated payload object to be sent in the API request",
 		},
 		description: "Generates the mock payload for an API call",
-		timeout: 5000,
+		timeout: 60 * 1000,
 		defaultBody: `  return defaultPayload;`,
 		template: (body: string) => `/**
  * Generates the mock payload for an API call in the transaction flow.
