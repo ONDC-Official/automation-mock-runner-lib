@@ -73,7 +73,7 @@ export class RunnerFactory {
 		// Node.js environment - returns Worker Thread
 		// This shouldn't be called for NodeRunner, but included for completeness
 		throw new Error(
-			"Use NodeRunner directly in Node.js environment instead of WorkerFactory"
+			"Use NodeRunner directly in Node.js environment instead of WorkerFactory",
 		);
 	}
 
@@ -105,9 +105,9 @@ export class RunnerFactory {
 	/**
 	 * Creates appropriate runner based on environment
 	 */
-	static createRunner(options?: any) {
+	static createRunner(options?: any, logger?: any): BrowserRunner | NodeRunner {
 		const env = RunnerFactory.getEnvironment();
-
+		logger?.debug(`Creating runner for environment: ${env}`);
 		if (env === "browser") {
 			return new BrowserRunner();
 		} else if (env === "node") {
