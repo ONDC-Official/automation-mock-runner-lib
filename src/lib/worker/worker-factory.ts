@@ -7,15 +7,13 @@ export class WorkerFactory {
         const { id, code, functionName, args } = event.data;
         const startTime = performance.now();
         let logs = [];
-        
-        try {
           // Capture console outputs
           const originalConsole = {
             log: console.log,
             error: console.error,
             warn: console.warn
           };
-          
+        try {
           console.log = (...logArgs) => {
             logs.push({
               type: 'log',
