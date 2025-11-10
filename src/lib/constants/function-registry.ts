@@ -1,6 +1,10 @@
 // lib/code-runner/function-registry.ts
 
-export type FunctionNamesType = "generate" | "validate" | "meetsRequirements";
+export type FunctionNamesType =
+	| "generate"
+	| "validate"
+	| "meetsRequirements"
+	| "getSave";
 export interface FunctionParameter {
 	name: string;
 	type: string;
@@ -144,6 +148,25 @@ ${body}
 function meetsRequirements(sessionData) {
 ${body}
 }`,
+	},
+	getSave: {
+		name: "getSave",
+		parameters: [
+			{
+				name: "payload",
+				type: "Object",
+				description: "The API request or response payload",
+				required: true,
+			},
+		],
+		returnType: {
+			type: "any",
+			description: "Returns any value",
+		},
+		description: "Evaluates custom code to get save value",
+		timeout: 3000,
+		defaultBody: "return null;",
+		template: (body: string) => body,
 	},
 };
 

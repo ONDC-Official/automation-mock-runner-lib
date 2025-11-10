@@ -165,14 +165,31 @@ describe("MockRunner", () => {
 	});
 
 	describe("Session Data Management", () => {
-		it("should extract session data correctly", () => {
-			const sessionData = mockRunner.getSessionDataUpToStep(0);
+		it("should extract session data correctly", async () => {
+			const sessionData = await mockRunner.getSessionDataUpToStep(0);
 			expect(sessionData).toEqual({});
 		});
 
-		it("should handle invalid step indices", () => {
-			const sessionData = mockRunner.getSessionDataUpToStep(-1);
+		it("should handle invalid step indices", async () => {
+			const sessionData = await mockRunner.getSessionDataUpToStep(-1);
 			expect(sessionData).toEqual({});
+		});
+	});
+
+	describe("Eval type in saveData", () => {
+		it("should evaluate expressions in saveData correctly", async () => {
+			const fun = MockRunner.encodeBase64(`async function getSave(payload){
+				console.log('Payload in getSave:', payload);
+				return payload.a + payload.b;
+			}`);
+			const ob = {
+				a: 1,
+				b: 2,
+			};
+			const res = await MockRunner.runGetSave(ob, fun);
+			console.log(JSON.stringify(res, null, 2));
+			console.log(Object.keys(ob).length);
+			expect(res.result).toBe(ob.a + ob.b);
 		});
 	});
 });

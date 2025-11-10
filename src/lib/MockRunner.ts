@@ -95,7 +95,7 @@ export class MockRunner {
 			const defaultPayload = JSON.parse(
 				JSON.stringify(step.mock.defaultPayload),
 			);
-			const sessionData = this.getSessionDataUpToStep(index);
+			const sessionData = await this.getSessionDataUpToStep(index);
 
 			// Validate inputs against schema if provided
 			if (step.mock.inputs?.jsonSchema && Object.keys(inputs).length > 0) {
@@ -247,7 +247,7 @@ export class MockRunner {
 				(s) => s.action_id === actionId,
 			);
 			const schema = getFunctionSchema("validate");
-			const sessionData = this.getSessionDataUpToStep(index);
+			const sessionData = await this.getSessionDataUpToStep(index);
 
 			const result = await this.getRunnerInstance().execute(
 				MockRunner.decodeBase64(step.mock.validate),
@@ -313,7 +313,7 @@ export class MockRunner {
 				(s) => s.action_id === actionId,
 			);
 			const schema = getFunctionSchema("meetsRequirements");
-			const sessionData = this.getSessionDataUpToStep(index);
+			const sessionData = await this.getSessionDataUpToStep(index);
 
 			const result = await this.getRunnerInstance().execute(
 				MockRunner.decodeBase64(step.mock.requirements),
@@ -506,7 +506,9 @@ export class MockRunner {
 			},
 		};
 	}
-	public getSessionDataUpToStep(index: number): Record<string, any> {
+	public async getSessionDataUpToStep(
+		index: number,
+	): Promise<Record<string, any>> {
 		const config = this.config;
 		if (index < 0 || index > config.steps.length) {
 			this.logger.warn("Invalid step index for session data", {
@@ -537,7 +539,10 @@ export class MockRunner {
 
 			for (const key in saveData) {
 				const path = saveData[key];
-
+				const isAppend = key.startsWith("APPEND#");
+				const isEval = key.startsWith("EVAL#");
+				const evalExpression = key.split("#")[2];
+				const actualKey = isAppend ? key.split("#")[1] : key;
 				try {
 					// Validate JSONPath expression
 					if (!path || typeof path !== "string") {
@@ -550,23 +555,39 @@ export class MockRunner {
 					}
 
 					const values = jsonpath.query(histItem.payload, path);
-					const value = values[0];
 
-					if (value !== undefined) {
-						sessionData[key] = value;
-						this.logger.debug("Session data extracted", {
+					if (isEval && evalExpression) {
+						// Evaluate the expression using the extracted values
+						sessionData[actualKey] = await MockRunner.runGetSave(
+							values,
+							evalExpression,
+						);
+						this.logger.debug("Session data extracted via EVAL", {
 							step: i,
 							key,
 							path,
 							hasValue: true,
 						});
 					} else {
-						this.logger.debug("No value found for JSONPath", {
-							step: i,
-							key,
-							path,
-						});
-						sessionData[key] = null;
+						if (values !== undefined) {
+							sessionData[actualKey] = isAppend
+								? (sessionData[actualKey] || []).concat(values)
+								: values;
+
+							this.logger.debug("Session data extracted", {
+								step: i,
+								key,
+								path,
+								hasValue: true,
+							});
+						} else {
+							this.logger.debug("No value found for JSONPath", {
+								step: i,
+								key,
+								path,
+							});
+							sessionData[actualKey] = null;
+						}
 					}
 				} catch (error) {
 					this.logger.error(
@@ -589,6 +610,13 @@ export class MockRunner {
 		});
 
 		return sessionData;
+	}
+
+	public static async runGetSave(payload: any, expression: string) {
+		const evalExpression = MockRunner.decodeBase64(expression);
+		const runner = RunnerFactory.createRunner();
+		const schema = getFunctionSchema("getSave");
+		return await runner.execute(evalExpression, schema, [payload]);
 	}
 
 	public static encodeBase64(input: string): string {
