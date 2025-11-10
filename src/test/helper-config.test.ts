@@ -568,6 +568,7 @@ describe("configHelper", () => {
 				expect: true, // First step should have expect: true
 				unsolicited: false,
 				pair: "on_search_test", // Should find the matching response
+				repeat: 1,
 			});
 		});
 
