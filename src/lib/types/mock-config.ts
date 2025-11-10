@@ -37,6 +37,11 @@ export const PlaygroundActionStepSchema = z.object({
 	responseFor: z.string().nullable(),
 	unsolicited: z.boolean(),
 	description: z.string(),
+	repeatCount: z
+		.number()
+		.min(1, "Repeat count must be at least 1")
+		.optional()
+		.nullable(),
 	mock: MockConfigSchema,
 });
 

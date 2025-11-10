@@ -44,6 +44,7 @@ export function convertToFlowConfig(config: MockPlaygroundConfigType) {
 			expect: index === 0 ? true : false,
 			unsolicited: step.unsolicited,
 			pair: pair,
+			repeat: step.repeatCount || 1,
 		};
 
 		if (
