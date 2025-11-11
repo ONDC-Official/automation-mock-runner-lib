@@ -191,5 +191,37 @@ describe("MockRunner", () => {
 			console.log(Object.keys(ob).length);
 			expect(res.result).toBe(ob.a + ob.b);
 		});
+
+		it("should timeout for long-running getSave functions", async () => {
+			const longRunningFunction =
+				MockRunner.encodeBase64(`async function getSave(payload){
+				console.log('Starting long-running operation...');
+				// Simulate a long-running operation that takes more than 3 seconds
+				await new Promise(resolve => setTimeout(resolve, 4000));
+				console.log('Long-running operation completed');
+				return payload.result;
+			}`);
+
+			const payload = {
+				result: "This should timeout",
+			};
+
+			// This should timeout and return an error result
+			const res = await MockRunner.runGetSave(payload, longRunningFunction);
+
+			console.log("Timeout test result:", JSON.stringify(res, null, 2));
+
+			// Expect the operation to fail due to timeout
+			expect(res.success).toBe(false);
+			expect(res.error).toBeDefined();
+			if (res.error) {
+				expect(
+					res.error.message.toLowerCase().includes("timeout") ||
+						res.error.message.includes("Timeout") ||
+						res.error.message.includes("TIMEOUT") ||
+						res.error.name.toLowerCase().includes("timeout"),
+				).toBe(true);
+			}
+		}, 10000); // Set Jest timeout to 10 seconds to allow for the timeout to occur
 	});
 });

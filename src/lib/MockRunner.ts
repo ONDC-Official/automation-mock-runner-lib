@@ -450,55 +450,106 @@ export class MockRunner {
 		};
 	}
 	public generateContext(actionId: string, action: string, sessionData?: any) {
-		let step = this.config.steps.find((s) => s.action_id === actionId);
-		if (!step) {
-			step = undefined;
-		}
-		const responseFor = step?.responseFor;
+		// Find the step configuration for this action
+		const step = this.config.steps.find((s) => s.action_id === actionId);
+
+		// Determine the message_id based on responseFor logic
 		let messageId = uuidv4();
-		if (responseFor) {
+
+		if (step?.responseFor) {
+			// Priority 1: Get from sessionData if available
 			if (
 				sessionData?.latestMessage_id &&
+				Array.isArray(sessionData.latestMessage_id) &&
 				sessionData.latestMessage_id.length > 0
 			) {
 				messageId = sessionData.latestMessage_id[0];
-			} else {
-				const responsePayload = this.config.transaction_history.find(
-					(item) => item.action_id === responseFor,
-				)?.payload;
-				if (responsePayload.context?.message_id) {
-					messageId = responsePayload.context.message_id;
+			}
+			// Priority 2: Fall back to transaction history
+			else {
+				const historyItem = this.config.transaction_history?.find(
+					(item) => item.action_id === step.responseFor,
+				);
+
+				if (historyItem?.payload?.context?.message_id) {
+					messageId = historyItem.payload.context.message_id;
 				}
 			}
 		}
+
+		// Safely extract transaction_id
+		const transactionId = (() => {
+			// Priority 1: Get from sessionData
+			if (sessionData?.transaction_id) {
+				const sessionTxnId = Array.isArray(sessionData.transaction_id)
+					? sessionData.transaction_id[0]
+					: sessionData.transaction_id;
+
+				// Only return if we got a valid non-empty value
+				if (sessionTxnId && sessionTxnId.trim().length > 0) {
+					return sessionTxnId;
+				}
+			}
+
+			// Priority 2: Get from transaction history (most recent)
+			if (this.config.transaction_history?.length > 0) {
+				const mostRecentHistory =
+					this.config.transaction_history[
+						this.config.transaction_history.length - 1
+					];
+
+				const historyTxnId =
+					mostRecentHistory?.payload?.context?.transaction_id;
+				if (historyTxnId && historyTxnId.trim().length > 0) {
+					return historyTxnId;
+				}
+			}
+
+			// Priority 3: Get from transaction_data
+			const configTxnId = this.config.transaction_data?.transaction_id;
+			if (configTxnId && configTxnId.trim().length > 0) {
+				return configTxnId;
+			}
+
+			// Priority 4: Generate new UUID as last resort
+			return uuidv4();
+		})();
+
+		// Build base context
 		const baseContext: any = {
-			domain: this.config.meta.domain,
+			domain: this.config.meta?.domain || "",
 			action: action,
 			timestamp: new Date().toISOString(),
-			transaction_id:
-				sessionData?.transaction_id[0] ||
-				this.config.transaction_data.transaction_id,
+			transaction_id: transactionId,
 			message_id: messageId,
-			bap_id: this.config.transaction_data.bap_id || "",
-			bap_uri: this.config.transaction_data.bap_uri || "",
+			bap_id: this.config.transaction_data?.bap_id || "",
+			bap_uri: this.config.transaction_data?.bap_uri || "",
 			ttl: "PT30S",
 		};
-		if (action != "search") {
-			baseContext.bpp_id = this.config.transaction_data.bpp_id || "";
-			baseContext.bpp_uri = this.config.transaction_data.bpp_uri || "";
+
+		// Add BPP details for non-search actions
+		if (action !== "search") {
+			baseContext.bpp_id = this.config.transaction_data?.bpp_id || "";
+			baseContext.bpp_uri = this.config.transaction_data?.bpp_uri || "";
 		}
 
-		if (this.config.meta.version.split(".")[0] === "1") {
+		// Version-specific context structure
+		const version = this.config.meta?.version || "2.0.0";
+		const majorVersion = parseInt(version.split(".")[0], 10);
+
+		if (majorVersion === 1) {
 			return {
 				...baseContext,
 				country: "IND",
 				city: "*",
-				core_version: this.config.meta.version,
+				core_version: version,
 			};
 		}
+
+		// Version 2+ format
 		return {
 			...baseContext,
-			version: this.config.meta.version,
+			version: version,
 			location: {
 				country: {
 					code: "IND",
