@@ -556,7 +556,8 @@ export class MockRunner {
 					}
 
 					const values = evalExpression
-						? await MockRunner.runGetSave(histItem.payload, evalExpression)
+						? (await MockRunner.runGetSave(histItem.payload, evalExpression))
+								.result
 						: jsonpath.query(histItem.payload, actualPath);
 
 					if (values !== undefined) {
