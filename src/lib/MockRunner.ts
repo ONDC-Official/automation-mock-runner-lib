@@ -540,9 +540,10 @@ export class MockRunner {
 			for (const key in saveData) {
 				const path = saveData[key];
 				const isAppend = key.startsWith("APPEND#");
-				const isEval = key.startsWith("EVAL#");
-				const evalExpression = key.split("#")[2];
+				const isEval = path.startsWith("EVAL#");
+				const evalExpression = isEval ? path.split("#")[2] : undefined;
 				const actualKey = isAppend ? key.split("#")[1] : key;
+				const actualPath = isEval ? path.split("#")[1] : path;
 				try {
 					// Validate JSONPath expression
 					if (!path || typeof path !== "string") {
@@ -554,40 +555,28 @@ export class MockRunner {
 						continue;
 					}
 
-					const values = jsonpath.query(histItem.payload, path);
+					const values = evalExpression
+						? await MockRunner.runGetSave(histItem.payload, evalExpression)
+						: jsonpath.query(histItem.payload, actualPath);
 
-					if (isEval && evalExpression) {
-						// Evaluate the expression using the extracted values
-						sessionData[actualKey] = await MockRunner.runGetSave(
-							values,
-							evalExpression,
-						);
-						this.logger.debug("Session data extracted via EVAL", {
+					if (values !== undefined) {
+						sessionData[actualKey] = isAppend
+							? (sessionData[actualKey] || []).concat(values)
+							: values;
+
+						this.logger.debug("Session data extracted", {
 							step: i,
 							key,
 							path,
 							hasValue: true,
 						});
 					} else {
-						if (values !== undefined) {
-							sessionData[actualKey] = isAppend
-								? (sessionData[actualKey] || []).concat(values)
-								: values;
-
-							this.logger.debug("Session data extracted", {
-								step: i,
-								key,
-								path,
-								hasValue: true,
-							});
-						} else {
-							this.logger.debug("No value found for JSONPath", {
-								step: i,
-								key,
-								path,
-							});
-							sessionData[actualKey] = null;
-						}
+						this.logger.debug("No value found for JSONPath", {
+							step: i,
+							key,
+							path,
+						});
+						sessionData[actualKey] = null;
 					}
 				} catch (error) {
 					this.logger.error(
