@@ -457,8 +457,11 @@ export class MockRunner {
 		const responseFor = step?.responseFor;
 		let messageId = uuidv4();
 		if (responseFor) {
-			if (sessionData?.latestMessage_id) {
-				messageId = sessionData.latestMessage_id;
+			if (
+				sessionData?.latestMessage_id &&
+				sessionData.latestMessage_id.length > 0
+			) {
+				messageId = sessionData.latestMessage_id[0];
 			} else {
 				const responsePayload = this.config.transaction_history.find(
 					(item) => item.action_id === responseFor,
@@ -473,7 +476,7 @@ export class MockRunner {
 			action: action,
 			timestamp: new Date().toISOString(),
 			transaction_id:
-				sessionData?.transaction_id ||
+				sessionData?.transaction_id[0] ||
 				this.config.transaction_data.transaction_id,
 			message_id: messageId,
 			bap_id: this.config.transaction_data.bap_id || "",
