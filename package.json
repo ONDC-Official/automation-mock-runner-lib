@@ -1,6 +1,6 @@
 {
 	"name": "@ondc/automation-mock-runner",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"description": "A TypeScript library for ONDC automation mock runner",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
