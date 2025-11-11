@@ -541,7 +541,7 @@ export class MockRunner {
 				const path = saveData[key];
 				const isAppend = key.startsWith("APPEND#");
 				const isEval = path.startsWith("EVAL#");
-				const evalExpression = isEval ? path.split("#")[2] : undefined;
+				const evalExpression = isEval ? path.split("#")[1] : undefined;
 				const actualKey = isAppend ? key.split("#")[1] : key;
 				const actualPath = isEval ? path.split("#")[1] : path;
 				try {
