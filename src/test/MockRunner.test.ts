@@ -2,6 +2,7 @@
  * Tests for MockRunner class - ONDC Automation Mock Runner
  */
 
+import { createOptimizedMockConfig } from "../lib/configHelper";
 import { MockRunner } from "../lib/MockRunner";
 import { MockPlaygroundConfigType } from "../lib/types/mock-config";
 
@@ -9,7 +10,7 @@ describe("MockRunner", () => {
 	let mockRunner: MockRunner;
 	let mockConfig: MockPlaygroundConfigType;
 
-	beforeEach(() => {
+	beforeEach(async () => {
 		mockConfig = {
 			meta: {
 				domain: "ONDC:TRV14",
@@ -27,7 +28,12 @@ describe("MockRunner", () => {
 		};
 		try {
 			mockRunner = new MockRunner(mockConfig);
-			mockConfig.steps.push(mockRunner.getDefaultStep("search", "search_0"));
+			mockRunner
+				.getConfig()
+				.steps.push(mockRunner.getDefaultStep("search", "search_0"));
+			mockRunner = new MockRunner(
+				await createOptimizedMockConfig(mockRunner.getConfig()),
+			);
 		} catch (error) {
 			throw error;
 		}
@@ -187,8 +193,6 @@ describe("MockRunner", () => {
 				b: 2,
 			};
 			const res = await MockRunner.runGetSave(ob, fun);
-			console.log(JSON.stringify(res, null, 2));
-			console.log(Object.keys(ob).length);
 			expect(res.result).toBe(ob.a + ob.b);
 		});
 

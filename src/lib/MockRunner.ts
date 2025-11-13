@@ -64,6 +64,10 @@ export class MockRunner {
 		return this.runner;
 	}
 
+	public getConfig() {
+		return this.config;
+	}
+
 	public validateConfig() {
 		const res = validateConfigWithErrors(this.config);
 		return res;

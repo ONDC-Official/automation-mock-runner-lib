@@ -1,5 +1,7 @@
+import { MockRunner } from "./MockRunner";
 import { MockPlaygroundConfigType } from "./types/mock-config";
 import { v4 as uuidv4 } from "uuid";
+import { minify } from "terser";
 export function createInitialMockConfig(
 	domain: string,
 	version: string,
@@ -64,4 +66,40 @@ export function convertToFlowConfig(config: MockPlaygroundConfigType) {
 		index++;
 	}
 	return flowConfig;
+}
+
+export async function createOptimizedMockConfig(
+	config: MockPlaygroundConfigType,
+): Promise<MockPlaygroundConfigType> {
+	const optimizedSteps = await Promise.all(
+		config.steps.map(async (step) => {
+			return {
+				...step,
+				mock: {
+					...step.mock,
+					generate: await getMinifiedCode(step.mock.generate),
+					validate: await getMinifiedCode(step.mock.validate),
+					requirements: await getMinifiedCode(step.mock.requirements),
+				},
+			};
+		}),
+	);
+
+	const optimizedConfig: MockPlaygroundConfigType = {
+		meta: config.meta,
+		transaction_history: [],
+		helperLib: config.helperLib,
+		validationLib: config.validationLib,
+		transaction_data: config.transaction_data,
+		steps: optimizedSteps,
+	};
+
+	return optimizedConfig;
+}
+
+export async function getMinifiedCode(base64Code: string): Promise<string> {
+	const decodedCode = MockRunner.decodeBase64(base64Code);
+	const result = await minify(decodedCode);
+	// If `minify` returns an object like { code: '...' }, return the string
+	return MockRunner.encodeBase64(result.code || decodedCode);
 }
