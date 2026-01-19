@@ -24,9 +24,48 @@ export function createInitialMockConfig(
 		steps: [],
 		transaction_history: [],
 		validationLib: "",
-		helperLib: "",
+		helperLib: MockRunner.encodeBase64(defaultHelpers),
 	};
 }
+
+const defaultHelpers = `/*
+	Custom helper functions available in all mock generation functions.
+	these are appended below the generate function for each step.
+*/
+
+// Generates a UUID v4
+function uuidv4() {
+	return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+	  const r = Math.random() * 16 | 0;
+	  const v = c === 'x' ? r : (r & 0x3 | 0x8);
+	  return v.toString(16);
+	});
+}
+
+// Generate a 6 digit string ID
+function generate6DigitId() {
+	return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// Returns the current ISO timestamp
+function currentTimestamp() {
+	return new Date().toISOString();
+}
+
+// Converts ISO 8601 duration string to total seconds
+const isoDurToSec = (duration) => {
+  const durRE = /P((\d+)Y)?((\d+)M)?((\d+)W)?((\d+)D)?T?((\d+)H)?((\d+)M)?((\d+)S)?/;
+  const s = durRE.exec(duration);
+  if (!s) return 0;
+  
+  return (Number(s?.[2]) || 0) * 31536000 +
+	(Number(s?.[4]) || 0) * 2628288 +
+	(Number(s?.[6]) || 0) * 604800 +
+	(Number(s?.[8]) || 0) * 86400 +
+	(Number(s?.[10]) || 0) * 3600 +
+	(Number(s?.[12]) || 0) * 60 +
+	(Number(s?.[14]) || 0);
+};`;
 
 export function convertToFlowConfig(config: MockPlaygroundConfigType) {
 	const flowConfig: any = {};
