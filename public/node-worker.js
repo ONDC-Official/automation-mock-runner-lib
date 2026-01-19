@@ -108,8 +108,8 @@ function createSandbox() {
 		decodeURIComponent,
 		// Utility functions for ONDC operations
 		setTimeout: (fn, delay) => {
-			if (delay < 1 || delay > 1000) {
-				throw new Error("Timeout must be between 1-1000ms");
+			if (delay < 1 || delay > 35 * 1000) {
+				throw new Error("Timeout must be between 1-35000ms");
 			}
 			return setTimeout(fn, delay);
 		},
@@ -151,7 +151,7 @@ parentPort?.on("message", async (message) => {
 
 		// Execute the script
 		script.runInContext(context, {
-			timeout: timeout || 5000,
+			timeout: timeout || 35000,
 			breakOnSigint: true,
 		});
 
@@ -168,8 +168,8 @@ parentPort?.on("message", async (message) => {
 			new Promise((_, reject) =>
 				setTimeout(
 					() => reject(new Error("Function execution timeout")),
-					timeout || 5000
-				)
+					timeout || 5000,
+				),
 			),
 		]);
 

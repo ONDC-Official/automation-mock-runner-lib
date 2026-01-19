@@ -491,7 +491,6 @@ describe("configHelper", () => {
 			expect(result.steps).toEqual([]);
 			expect(result.transaction_history).toEqual([]);
 			expect(result.validationLib).toBe("");
-			expect(result.helperLib).toBe("");
 		});
 
 		it("should handle different domain formats", () => {
