@@ -116,11 +116,26 @@ export class MockRunner {
 
 			const schema = getFunctionSchema("generate");
 
-			const result = await this.getRunnerInstance().execute(
-				MockRunner.decodeBase64(step.mock.generate),
-				schema,
-				[defaultPayload, sessionData],
-			);
+			const code = MockRunner.decodeBase64(step.mock.generate);
+			let helperLib = "";
+			try {
+				helperLib = MockRunner.decodeBase64(this.config.helperLib || "");
+			} catch (e) {
+				this.logger.error(
+					"Failed to decode helper library",
+					{ actionId },
+					e as Error,
+				);
+				helperLib = "";
+			}
+
+			// Combine helper library and main code
+			const fullCode = helperLib + "\n" + code;
+
+			const result = await this.getRunnerInstance().execute(fullCode, schema, [
+				defaultPayload,
+				sessionData,
+			]);
 
 			const executionTime = Date.now() - startTime;
 			this.logger.logExecution(executionId, "Payload generation completed", {
