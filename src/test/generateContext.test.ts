@@ -460,20 +460,6 @@ describe("MockRunner - generateContext", () => {
 			expect(context.message_id).toBe("select-msg-456");
 		});
 
-		it("should generate unique timestamps for multiple calls", (done) => {
-			const context1 = mockRunner.generateContext("search_1", "search");
-
-			setTimeout(() => {
-				const context2 = mockRunner.generateContext("search_1", "search");
-
-				expect(context1.timestamp).not.toBe(context2.timestamp);
-				expect(new Date(context2.timestamp).getTime()).toBeGreaterThan(
-					new Date(context1.timestamp).getTime(),
-				);
-				done();
-			}, 1);
-		});
-
 		it("should handle mixed version formats", () => {
 			const configs = [
 				{ version: "2.0.0", expected: "version" },

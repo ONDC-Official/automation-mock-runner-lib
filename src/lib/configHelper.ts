@@ -2,6 +2,7 @@ import { MockRunner } from "./MockRunner";
 import { MockPlaygroundConfigType } from "./types/mock-config";
 import { v4 as uuidv4 } from "uuid";
 import { minify } from "terser";
+import { Flow } from "./types/flow-types";
 export function createInitialMockConfig(
 	domain: string,
 	version: string,
@@ -141,4 +142,85 @@ export async function getMinifiedCode(base64Code: string): Promise<string> {
 	const result = await minify(decodedCode);
 	// If `minify` returns an object like { code: '...' }, return the string
 	return MockRunner.encodeBase64(result.code || decodedCode);
+}
+
+type PayloadType = {
+	context: {
+		action: string;
+		timestamp: string;
+		domain: string;
+		version?: string;
+		core_version?: string;
+	};
+};
+
+/**
+ * Generates a playground configuration from a flow configuration and payloads.
+ *
+ * This function takes an array of payloads and a flow configuration, then creates
+ * a mock playground configuration by mapping payloads to their corresponding flow steps.
+ * Payloads are sorted by timestamp and matched to flow sequence steps by action type.
+ *
+ * @param payloads - Array of payload objects containing context and action information
+ * @param flowConfig - Flow configuration object containing sequence of steps and flow metadata
+ *
+ * @returns A promise that resolves to a MockPlaygroundConfigType object configured with
+ *          the mapped steps and their corresponding payloads
+ *
+ * @throws {Error} When insufficient payloads are provided for the flow sequence
+ * @throws {Error} When no payload is found for a required action type in the flow
+ *
+ * @example
+ * ```typescript
+ * const payloads = [{ context: { action: 'search', timestamp: '2023-01-01' } }];
+ * const flowConfig = { id: 'flow1', sequence: [{ type: 'search', key: 'step1' }] };
+ * const config = await generatePlaygroundConfigFromFlowConfig(payloads, flowConfig);
+ * ```
+ */
+export async function generatePlaygroundConfigFromFlowConfig(
+	payloads: PayloadType[],
+	flowConfig: Flow,
+) {
+	if (payloads.length < flowConfig.sequence.length) {
+		throw new Error(
+			`Insufficient payloads provided. Expected at least ${flowConfig.sequence.length}, but got ${payloads.length}`,
+		);
+	}
+	payloads = payloads.sort(
+		(a, b) =>
+			new Date(a.context.timestamp).getTime() -
+			new Date(b.context.timestamp).getTime(),
+	);
+	const domain = payloads[0].context.domain;
+	const version =
+		payloads[0].context.version || payloads[0].context.core_version || "1.0.0";
+	const config: MockPlaygroundConfigType = createInitialMockConfig(
+		domain,
+		version,
+		`${flowConfig.id}_logs_flow_${domain}_v${version}`,
+	);
+	const mockRunner = new MockRunner(config);
+
+	for (const step of flowConfig.sequence) {
+		const stepPayload = payloads.findIndex(
+			(p) => p.context.action === step.type,
+		); // and delete used payloads
+		if (stepPayload === -1) {
+			throw new Error(
+				`No payload found for action ${step.type} in flow ${flowConfig.id}`,
+			);
+		}
+		const payload = payloads[stepPayload];
+		payloads.splice(stepPayload, 1); // remove used payload
+		const stepConfig = mockRunner.getDefaultStep(step.type, step.key);
+		stepConfig.mock.inputs = {};
+		stepConfig.mock.defaultPayload = payload;
+		const findResponseFor = flowConfig.sequence.find(
+			(s) => s.pair === step.key,
+		);
+		stepConfig.responseFor = findResponseFor ? findResponseFor.key : null;
+		stepConfig.unsolicited = step.unsolicited;
+		config.steps.push(stepConfig);
+	}
+	return config;
 }
