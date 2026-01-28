@@ -206,9 +206,16 @@ export async function generatePlaygroundConfigFromFlowConfig(
 	const mockRunner = new MockRunner(config);
 
 	for (const step of flowConfig.sequence) {
+		if (
+			step.type === "HTML_FORM" ||
+			step.type === "DYNAMIC_FORM" ||
+			step.type === "FORM"
+		) {
+			continue;
+		}
 		const stepPayload = payloads.findIndex(
 			(p) => p.context.action === step.type,
-		); // and delete used payloads
+		);
 		if (stepPayload === -1) {
 			throw new Error(
 				`No payload found for action ${step.type} in flow ${flowConfig.id}`,
