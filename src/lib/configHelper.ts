@@ -181,6 +181,10 @@ export async function generatePlaygroundConfigFromFlowConfig(
 	payloads: PayloadType[],
 	flowConfig: Flow,
 ) {
+	flowConfig = JSON.parse(JSON.stringify(flowConfig)) as Flow;
+	flowConfig.sequence = flowConfig.sequence.filter(
+		(step) => step.type === "HTML_FORM" || step.type === "DYNAMIC_FORM",
+	);
 	if (payloads.length < flowConfig.sequence.length) {
 		throw new Error(
 			`Insufficient payloads provided. Expected at least ${flowConfig.sequence.length}, but got ${payloads.length}`,
