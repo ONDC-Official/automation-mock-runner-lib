@@ -97,6 +97,7 @@ export function convertToFlowConfig(config: MockPlaygroundConfigType) {
 			flowStep.input = [
 				{
 					name: step.mock.inputs.id,
+					type: step.mock.inputs.id,
 					schema: step.mock.inputs.jsonSchema,
 				},
 			];
