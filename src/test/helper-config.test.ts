@@ -631,6 +631,7 @@ describe("configHelper", () => {
 			expect(stepWithInputs.input).toEqual([
 				{
 					name: "ExampleInputId",
+					type: "ExampleInputId",
 					schema: {
 						$schema: "http://json-schema.org/draft-07/schema#",
 						type: "object",
