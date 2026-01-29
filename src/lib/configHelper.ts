@@ -184,13 +184,8 @@ export async function generatePlaygroundConfigFromFlowConfig(
 ) {
 	flowConfig = JSON.parse(JSON.stringify(flowConfig)) as Flow;
 	flowConfig.sequence = flowConfig.sequence.filter(
-		(step) => step.type === "HTML_FORM" || step.type === "DYNAMIC_FORM",
+		(step) => step.type !== "HTML_FORM" && step.type !== "DYNAMIC_FORM",
 	);
-	if (payloads.length < flowConfig.sequence.length) {
-		throw new Error(
-			`Insufficient payloads provided. Expected at least ${flowConfig.sequence.length}, but got ${payloads.length}`,
-		);
-	}
 	payloads = payloads.sort(
 		(a, b) =>
 			new Date(a.context.timestamp).getTime() -
@@ -214,16 +209,11 @@ export async function generatePlaygroundConfigFromFlowConfig(
 		) {
 			continue;
 		}
-		const stepPayload = payloads.findIndex(
-			(p) => p.context.action === step.type,
-		);
+		let stepPayload = payloads.findIndex((p) => p.context.action === step.type);
+		const payload = stepPayload === -1 ? {} : payloads[stepPayload];
 		if (stepPayload === -1) {
-			throw new Error(
-				`No payload found for action ${step.type} in flow ${flowConfig.id}`,
-			);
+			payloads.splice(stepPayload, 1); // remove used payload
 		}
-		const payload = payloads[stepPayload];
-		payloads.splice(stepPayload, 1); // remove used payload
 		const stepConfig = mockRunner.getDefaultStep(step.type, step.key);
 		stepConfig.mock.inputs = {};
 		stepConfig.mock.defaultPayload = payload;

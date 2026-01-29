@@ -1,8 +1,10 @@
 import {
 	createInitialMockConfig,
 	convertToFlowConfig,
+	generatePlaygroundConfigFromFlowConfig,
 } from "../lib/configHelper";
 import { MockPlaygroundConfigType } from "../lib/types/mock-config";
+import { Flow } from "../lib/types/flow-types";
 
 // Mock UUID to get predictable test results
 jest.mock("uuid", () => ({
@@ -715,6 +717,206 @@ describe("configHelper", () => {
 			result.sequence.forEach((step: any, index: number) => {
 				expect(step.key).toBe(expectedOrder[index]);
 			});
+		});
+	});
+
+	describe("generatePlaygroundConfigFromFlowConfig", () => {
+		// Minimal payload type compatible with the helper
+		type TestPayload = {
+			context: {
+				action: string;
+				timestamp: string;
+				domain: string;
+				version?: string;
+				core_version?: string;
+			};
+		};
+
+		it("should generate config with meta derived from earliest payload and map steps", async () => {
+			const searchPayload: TestPayload = {
+				context: {
+					action: "search",
+					timestamp: "2025-01-01T09:00:00.000Z",
+					domain: "ONDC:TRV14",
+					version: "1.5.0",
+				},
+			};
+			const onSearchPayload: TestPayload = {
+				context: {
+					action: "on_search",
+					timestamp: "2025-01-02T10:00:00.000Z",
+					domain: "ONDC:TRV14",
+					version: "1.5.0",
+				},
+			};
+
+			// Intentionally unsorted by timestamp to verify internal sorting
+			const payloads: TestPayload[] = [onSearchPayload, searchPayload];
+
+			const flowConfig: Flow = {
+				id: "sample_flow",
+				title: "Sample Flow",
+				description: "Test flow for playground config generation",
+				sequence: [
+					{
+						key: "search_step",
+						type: "search",
+						unsolicited: false,
+						description: "Search step",
+						pair: null,
+						owner: "BAP",
+					},
+					{
+						key: "on_search_step",
+						type: "on_search",
+						unsolicited: false,
+						description: "On search step",
+						pair: "search_step",
+						owner: "BPP",
+					},
+				],
+			};
+
+			const config = await generatePlaygroundConfigFromFlowConfig(
+				payloads,
+				flowConfig,
+			);
+
+			expect(config.meta.domain).toBe("ONDC:TRV14");
+			expect(config.meta.version).toBe("1.5.0");
+			expect(config.meta.flowId).toBe(
+				"sample_flow_logs_flow_ONDC:TRV14_v1.5.0",
+			);
+
+			expect(config.steps).toHaveLength(2);
+			const [searchStepConfig, onSearchStepConfig] = config.steps;
+
+			expect(searchStepConfig.api).toBe("search");
+			expect(searchStepConfig.action_id).toBe("search_step");
+			expect(searchStepConfig.responseFor).toBe("on_search_step");
+			expect(searchStepConfig.unsolicited).toBe(false);
+			expect(searchStepConfig.mock.inputs).toEqual({});
+			expect(searchStepConfig.mock.defaultPayload).toBe(searchPayload);
+
+			expect(onSearchStepConfig.api).toBe("on_search");
+			expect(onSearchStepConfig.action_id).toBe("on_search_step");
+			expect(onSearchStepConfig.responseFor).toBeNull();
+			expect(onSearchStepConfig.unsolicited).toBe(false);
+			expect(onSearchStepConfig.mock.inputs).toEqual({});
+			expect(onSearchStepConfig.mock.defaultPayload).toBe(onSearchPayload);
+		});
+
+		it("should ignore HTML_FORM and DYNAMIC_FORM steps and preserve unsolicited flag", async () => {
+			const payloads: TestPayload[] = [
+				{
+					context: {
+						action: "search",
+						timestamp: "2025-01-01T09:00:00.000Z",
+						domain: "ONDC:RET10",
+						version: "2.0.0",
+					},
+				},
+				{
+					context: {
+						action: "on_status",
+						timestamp: "2025-01-01T10:00:00.000Z",
+						domain: "ONDC:RET10",
+						version: "2.0.0",
+					},
+				},
+			];
+
+			const flowConfig: Flow = {
+				id: "flow_with_forms",
+				sequence: [
+					{
+						key: "search_step",
+						type: "search",
+						unsolicited: false,
+						description: "Search step",
+						pair: null,
+						owner: "BAP",
+					},
+					{
+						key: "html_form_step",
+						type: "HTML_FORM",
+						unsolicited: false,
+						description: "HTML form step",
+						pair: null,
+						owner: "BAP",
+					},
+					{
+						key: "dynamic_form_step",
+						type: "DYNAMIC_FORM",
+						unsolicited: false,
+						description: "Dynamic form step",
+						pair: null,
+						owner: "BAP",
+					},
+					{
+						key: "on_status_step",
+						type: "on_status",
+						unsolicited: true,
+						description: "Unsolicited status",
+						pair: null,
+						owner: "BPP",
+					},
+				],
+			};
+
+			const config = await generatePlaygroundConfigFromFlowConfig(
+				payloads,
+				flowConfig,
+			);
+
+			// Only non-form steps should be present
+			expect(config.steps.map((s) => s.action_id)).toEqual([
+				"search_step",
+				"on_status_step",
+			]);
+
+			const onStatusStep = config.steps.find(
+				(s) => s.action_id === "on_status_step",
+			);
+			expect(onStatusStep?.unsolicited).toBe(true);
+		});
+
+		it("should derive version from core_version when version is missing", async () => {
+			const payloads: TestPayload[] = [
+				{
+					context: {
+						action: "search",
+						timestamp: "2025-01-01T09:00:00.000Z",
+						domain: "ONDC:FIS12",
+						core_version: "1.0.0",
+					},
+				},
+			];
+
+			const flowConfig: Flow = {
+				id: "core_version_flow",
+				sequence: [
+					{
+						key: "search_step",
+						type: "search",
+						unsolicited: false,
+						description: "Search step",
+						pair: null,
+						owner: "BAP",
+					},
+				],
+			};
+
+			const config = await generatePlaygroundConfigFromFlowConfig(
+				payloads,
+				flowConfig,
+			);
+
+			expect(config.meta.domain).toBe("ONDC:FIS12");
+			expect(config.meta.version).toBe("1.0.0");
+			expect(config.meta.flowId).toBe(
+				"core_version_flow_logs_flow_ONDC:FIS12_v1.0.0",
+			);
 		});
 	});
 
