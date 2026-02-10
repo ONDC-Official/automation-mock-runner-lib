@@ -78,17 +78,40 @@ export function convertToFlowConfig(config: MockPlaygroundConfigType) {
 		const pair =
 			config.steps.find((s) => s.responseFor === step.action_id)?.action_id ||
 			null;
-		const flowStep: any = {
-			key: step.action_id,
-			type: step.api,
-			owner: step.owner,
-			description: step.description || "",
-			expect: index === 0 ? true : false,
-			unsolicited: step.unsolicited,
-			pair: pair,
-			repeat: step.repeatCount || 1,
-		};
 
+		let flowStep: any = {};
+		if (step.api === "dynamic_form") {
+			flowStep = {
+				key: step.action_id,
+				type: "DYNAMIC_FORM",
+				owner: step.owner,
+				description: step.description || "",
+				label: step.description || "FORM",
+				unsolicited: step.unsolicited,
+				pair: pair,
+				repeat: step.repeatCount || 1,
+				input: [
+					{
+						name: "form_submission_id",
+						label: "Enter form submission ID",
+						type: "DYNAMIC_FORM",
+						payloadField: "form_submission_id",
+						reference: `$.reference_data.${step.action_id}`,
+					},
+				],
+			};
+		} else {
+			flowStep = {
+				key: step.action_id,
+				type: step.api,
+				owner: step.owner,
+				description: step.description || "",
+				expect: index === 0 ? true : false,
+				unsolicited: step.unsolicited,
+				pair: pair,
+				repeat: step.repeatCount || 1,
+			};
+		}
 		if (
 			step.mock.inputs !== undefined &&
 			step.mock.inputs !== null &&
