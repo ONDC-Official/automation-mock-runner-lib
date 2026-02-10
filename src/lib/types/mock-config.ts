@@ -28,6 +28,7 @@ export const MockConfigSchema = z.object({
 		id: z.string().min(1, "Input ID is required").optional(),
 		jsonSchema: z.any().optional(),
 	}),
+	formHtml: z.base64().optional(),
 });
 
 export const PlaygroundActionStepSchema = z.object({

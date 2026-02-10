@@ -9,7 +9,10 @@ import {
 	ConfigurationError,
 } from "./utils/errors";
 import jsonpath from "jsonpath";
-import { getFunctionSchema } from "./constants/function-registry";
+import {
+	getDefaultForm,
+	getFunctionSchema,
+} from "./constants/function-registry";
 import { ExecutionResult } from "./types/execution-results";
 import { v4 as uuidv4 } from "uuid";
 
@@ -405,7 +408,42 @@ export class MockRunner {
 	public getDefaultStep(
 		api: string,
 		actionId: string,
+		formType?: "dynamic_form" | "html_form",
 	): MockPlaygroundConfigType["steps"][0] {
+		if (formType === "html_form") {
+			throw new Error("HTML form generation is not implemented yet");
+		}
+		if (formType === "dynamic_form") {
+			return {
+				api: api,
+				action_id: actionId,
+				owner: "BPP",
+				responseFor: null,
+				unsolicited: false,
+				description: "please add relevant description",
+				mock: {
+					generate: MockRunner.encodeBase64(
+						getFunctionSchema("generate").template(
+							getFunctionSchema("generate").defaultBody,
+						),
+					),
+					validate: MockRunner.encodeBase64(
+						getFunctionSchema("validate").template(
+							getFunctionSchema("validate").defaultBody,
+						),
+					),
+					requirements: MockRunner.encodeBase64(
+						getFunctionSchema("meetsRequirements").template(
+							getFunctionSchema("meetsRequirements").defaultBody,
+						),
+					),
+					defaultPayload: {},
+					saveData: {},
+					inputs: {},
+					formHtml: MockRunner.encodeBase64(getDefaultForm()),
+				},
+			};
+		}
 		return {
 			api: api,
 			action_id: actionId,
