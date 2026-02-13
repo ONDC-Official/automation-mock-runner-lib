@@ -112,8 +112,9 @@ export class MockRunner {
 					inputSchema: step.mock.inputs.jsonSchema,
 				});
 			}
-
-			sessionData.user_inputs = inputs;
+			if (Object.keys(inputs).length > 0) {
+				sessionData.user_inputs = inputs;
+			}
 			const context = this.generateContext(step.action_id, step.api);
 			defaultPayload.context = context;
 
