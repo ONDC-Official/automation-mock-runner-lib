@@ -661,6 +661,20 @@ export class MockRunner {
 			const histItem = config.transaction_history[i] ?? {
 				payload: {},
 			};
+
+			if (
+				histItem.action === "dynamic_form" ||
+				histItem.action === "html_form"
+			) {
+				if (!sessionData.formData) {
+					sessionData.formData = {};
+				}
+				sessionData.formData[histItem.action_id] = histItem.payload;
+				sessionData[histItem.action_id] =
+					histItem.saved_info?.submissionId ?? uuidv4();
+				continue;
+			}
+
 			const saveData = config.steps[i]?.mock.saveData ?? {};
 
 			for (const key in saveData) {
