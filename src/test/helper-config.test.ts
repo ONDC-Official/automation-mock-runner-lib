@@ -480,9 +480,9 @@ describe("configHelper", () => {
 			expect(result.transaction_data).toEqual({
 				transaction_id: "test-uuid-1234",
 				latest_timestamp: "1970-01-01T00:00:00.000Z",
-				bap_id: "sample-bap-id",
+				bap_id: "bap.example.com",
 				bap_uri: "https://bap.example.com",
-				bpp_id: "sample-bpp-id",
+				bpp_id: "bpp.example.com",
 				bpp_uri: "https://bpp.example.com",
 			});
 		});

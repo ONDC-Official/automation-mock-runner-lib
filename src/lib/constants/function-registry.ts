@@ -185,10 +185,11 @@ export function getDefaultForm() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Additional Details</title>
+  <title>ENTER FORM TITLE HERE</title>
 </head>
 
 <body>
+  <!-- note: update the form id here and don't change the actionUrl template -->
   <form id="additionalDetailsForm" method="POST" action="<%= actionUrl %>">
     <label for="name">Name</label>
     <input type="text" id="name" name="name" />
@@ -222,8 +223,7 @@ export function getDefaultForm() {
 
     <label for="passportNumber">Passport Number</label>
     <input type="text" id="passportNumber" name="passportNumber" />
-    <input type="hidden" id="formId" name="formId" value="FO1">
-    <input type="hidden" id="transactionId" name="transactionId" value="cf7bb367-c820-4bc9-9be8-f548e0bbf222">
+  	<!-- note: do not remove the submit button-->
     <input type="submit" value="Submit">
   </form>
 </body>

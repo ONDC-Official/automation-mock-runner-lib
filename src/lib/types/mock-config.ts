@@ -48,6 +48,7 @@ export const PlaygroundActionStepSchema = z.object({
 
 export const TransactionHistoryItemSchema = z.object({
 	action_id: z.string().min(1, "Action ID is required"),
+	action: z.string().optional(),
 	payload: z.any(),
 	saved_info: z.record(z.string(), z.any()),
 });

@@ -17,9 +17,9 @@ export function createInitialMockConfig(
 		transaction_data: {
 			transaction_id: uuidv4(),
 			latest_timestamp: new Date(0).toISOString(),
-			bap_id: "sample-bap-id",
+			bap_id: "bap.example.com",
 			bap_uri: "https://bap.example.com",
-			bpp_id: "sample-bpp-id",
+			bpp_id: "bpp.example.com",
 			bpp_uri: "https://bpp.example.com",
 		},
 		steps: [],
@@ -33,6 +33,13 @@ const defaultHelpers = `/*
 	Custom helper functions available in all mock generation functions.
 	these are appended below the generate function for each step.
 */
+
+const createFormURL = (domain,formId, sessionData) => {
+	const baseURL = sessionData.mockBaseUrl;
+	const transactionId = sessionData.transactionId[0];
+	const sessionId = sessionData.sessionId;
+	return \`\${baseURL}/forms/\${domain}/\${formId}/?transaction_id=\${transactionId}&session_id=\${sessionId}\`;
+}
 
 // Generates a UUID v4
 function uuidv4() {
