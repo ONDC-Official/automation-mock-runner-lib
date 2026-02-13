@@ -241,7 +241,7 @@ export async function generatePlaygroundConfigFromFlowConfig(
 		}
 		let stepPayload = payloads.findIndex((p) => p.context.action === step.type);
 		const payload = stepPayload === -1 ? {} : payloads[stepPayload];
-		if (stepPayload === -1) {
+		if (stepPayload !== -1) {
 			payloads.splice(stepPayload, 1); // remove used payload
 		}
 		const stepConfig = mockRunner.getDefaultStep(step.type, step.key);

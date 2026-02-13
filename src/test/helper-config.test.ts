@@ -918,6 +918,166 @@ describe("configHelper", () => {
 				"core_version_flow_logs_flow_ONDC:FIS12_v1.0.0",
 			);
 		});
+
+		it("should handle multiple search requests with different timestamps interspersed with on_search responses", async () => {
+			const payloads: TestPayload[] = [
+				{
+					context: {
+						action: "search",
+						timestamp: "2025-01-01T09:00:00.000Z",
+						domain: "ONDC:RET10",
+						version: "1.0.0",
+					},
+				},
+				{
+					context: {
+						action: "on_search",
+						timestamp: "2025-01-01T09:01:00.000Z",
+						domain: "ONDC:RET10",
+						version: "1.0.0",
+					},
+				},
+				{
+					context: {
+						action: "search",
+						timestamp: "2025-01-01T09:02:00.000Z",
+						domain: "ONDC:RET10",
+						version: "1.0.0",
+					},
+				},
+				{
+					context: {
+						action: "on_search",
+						timestamp: "2025-01-01T09:03:00.000Z",
+						domain: "ONDC:RET10",
+						version: "1.0.0",
+					},
+				},
+				{
+					context: {
+						action: "search",
+						timestamp: "2025-01-01T09:04:00.000Z",
+						domain: "ONDC:RET10",
+						version: "1.0.0",
+					},
+				},
+				{
+					context: {
+						action: "on_search",
+						timestamp: "2025-01-01T09:05:00.000Z",
+						domain: "ONDC:RET10",
+						version: "1.0.0",
+					},
+				},
+			];
+
+			const flowConfig: Flow = {
+				id: "multi_search_flow",
+				sequence: [
+					{
+						key: "search_1",
+						type: "search",
+						unsolicited: false,
+						description: "First search step",
+						pair: null,
+						owner: "BAP",
+					},
+					{
+						key: "on_search_1",
+						type: "on_search",
+						unsolicited: false,
+						description: "First on_search step",
+						pair: "search_1",
+						owner: "BPP",
+					},
+					{
+						key: "search_2",
+						type: "search",
+						unsolicited: false,
+						description: "Second search step",
+						pair: null,
+						owner: "BAP",
+					},
+					{
+						key: "on_search_2",
+						type: "on_search",
+						unsolicited: false,
+						description: "Second on_search step",
+						pair: "search_2",
+						owner: "BPP",
+					},
+					{
+						key: "search_3",
+						type: "search",
+						unsolicited: false,
+						description: "Third search step",
+						pair: null,
+						owner: "BAP",
+					},
+					{
+						key: "on_search_3",
+						type: "on_search",
+						unsolicited: false,
+						description: "Third on_search step",
+						pair: "search_3",
+						owner: "BPP",
+					},
+				],
+			};
+
+			const config = await generatePlaygroundConfigFromFlowConfig(
+				payloads,
+				flowConfig,
+			);
+
+			// Verify all 6 steps (3 search + 3 on_search) are present
+			expect(config.steps).toHaveLength(6);
+
+			// Verify the order and types of steps
+			expect(config.steps[0].api).toBe("search");
+			expect(config.steps[0].action_id).toBe("search_1");
+			expect(config.steps[0].mock.defaultPayload.context.timestamp).toBe(
+				"2025-01-01T09:00:00.000Z",
+			);
+
+			expect(config.steps[1].api).toBe("on_search");
+			expect(config.steps[1].action_id).toBe("on_search_1");
+			expect(config.steps[1].mock.defaultPayload.context.timestamp).toBe(
+				"2025-01-01T09:01:00.000Z",
+			);
+
+			expect(config.steps[2].api).toBe("search");
+			expect(config.steps[2].action_id).toBe("search_2");
+			expect(config.steps[2].mock.defaultPayload.context.timestamp).toBe(
+				"2025-01-01T09:02:00.000Z",
+			);
+
+			expect(config.steps[3].api).toBe("on_search");
+			expect(config.steps[3].action_id).toBe("on_search_2");
+			expect(config.steps[3].mock.defaultPayload.context.timestamp).toBe(
+				"2025-01-01T09:03:00.000Z",
+			);
+
+			expect(config.steps[4].api).toBe("search");
+			expect(config.steps[4].action_id).toBe("search_3");
+			expect(config.steps[4].mock.defaultPayload.context.timestamp).toBe(
+				"2025-01-01T09:04:00.000Z",
+			);
+
+			expect(config.steps[5].api).toBe("on_search");
+			expect(config.steps[5].action_id).toBe("on_search_3");
+			expect(config.steps[5].mock.defaultPayload.context.timestamp).toBe(
+				"2025-01-01T09:05:00.000Z",
+			);
+
+			// Verify responseFor relationships
+			expect(config.steps[0].responseFor).toBe("on_search_1");
+			expect(config.steps[1].responseFor).toBeNull();
+			expect(config.steps[2].responseFor).toBe("on_search_2");
+			expect(config.steps[3].responseFor).toBeNull();
+			expect(config.steps[4].responseFor).toBe("on_search_3");
+			expect(config.steps[5].responseFor).toBeNull();
+		});
 	});
 
 	describe("Edge Cases", () => {
