@@ -588,6 +588,23 @@ export class MockRunner {
 			return uuidv4();
 		})();
 
+		const bapId =
+			MockRunner.getIdFromSession(sessionData, "bapId") ||
+			this.config.transaction_data?.bap_id ||
+			"";
+		const bppId =
+			MockRunner.getIdFromSession(sessionData, "bppId") ||
+			this.config.transaction_data?.bpp_id ||
+			"";
+		const bapUri =
+			MockRunner.getIdFromSession(sessionData, "bapUri") ||
+			this.config.transaction_data?.bap_uri ||
+			"";
+		const bppUri =
+			MockRunner.getIdFromSession(sessionData, "bppUri") ||
+			this.config.transaction_data?.bpp_uri ||
+			"";
+
 		// Build base context
 		const baseContext: any = {
 			domain: this.config.meta?.domain || "",
@@ -595,15 +612,15 @@ export class MockRunner {
 			timestamp: new Date().toISOString(),
 			transaction_id: transactionId,
 			message_id: messageId,
-			bap_id: this.config.transaction_data?.bap_id || "",
-			bap_uri: this.config.transaction_data?.bap_uri || "",
+			bap_id: bapId,
+			bap_uri: bapUri,
 			ttl: "PT30S",
 		};
 
 		// Add BPP details for non-search actions
 		if (action !== "search") {
-			baseContext.bpp_id = this.config.transaction_data?.bpp_id || "";
-			baseContext.bpp_uri = this.config.transaction_data?.bpp_uri || "";
+			baseContext.bpp_id = bppId;
+			baseContext.bpp_uri = bppUri;
 		}
 
 		// Version-specific context structure
@@ -760,5 +777,22 @@ export class MockRunner {
 			[...binaryString].map((char) => char.charCodeAt(0)),
 		);
 		return new TextDecoder().decode(bytes);
+	}
+
+	private static getIdFromSession(
+		sessionData: any,
+		key: string,
+	): string | undefined {
+		if (sessionData === undefined) {
+			return undefined;
+		}
+		const data = sessionData[key];
+		if (Array.isArray(data) && data.length > 0) {
+			return data[0];
+		}
+		if (typeof data === "string") {
+			return data;
+		}
+		return undefined;
 	}
 }
