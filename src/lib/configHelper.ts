@@ -77,13 +77,13 @@ const isoDurToSec = (duration) => {
 
 const setCityFromInputs = (payload, inputs) => {
 	if (!inputs) return "*";
-	if (payload.context.version.startsWith("1")) {
+	let version = payload.context.version || payload.context.core_version || "2.0.0";
+	if (version.startsWith("1")) {
 		payload.context.city = inputs.city_code ?? "*";
 	} else {
 		payload.context.location.city.code = inputs.city_code ?? "*";
 	}
 }
-
 `;
 
 export function convertToFlowConfig(config: MockPlaygroundConfigType) {
@@ -258,7 +258,7 @@ export async function generatePlaygroundConfigFromFlowConfig(
 		}
 		const stepConfig = mockRunner.getDefaultStep(step.type, step.key);
 		if (index === 0) {
-			stepConfig.mock.defaultPayload = MockRunner.encodeBase64(
+			stepConfig.mock.generate = MockRunner.encodeBase64(
 				`async function generate(defaultPayload, sessionData) {
   	setCityFromInputs(defaultPayload, sessionData.user_inputs);
   return defaultPayload;
@@ -275,6 +275,7 @@ export async function generatePlaygroundConfigFromFlowConfig(
 		stepConfig.responseFor = findResponseFor ? findResponseFor.key : null;
 		stepConfig.unsolicited = step.unsolicited;
 		config.steps.push(stepConfig);
+		index++;
 	}
 	return config;
 }
