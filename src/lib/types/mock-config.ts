@@ -7,6 +7,7 @@ export const MetaSchema = z.object({
 	domain: z.string().min(1, "Domain is required"),
 	version: z.string().min(1, "Version is required"),
 	flowId: z.string().min(1, "Flow ID is required"),
+	config_version: z.string().optional(),
 });
 
 export const TransactionDataSchema = z.object({
