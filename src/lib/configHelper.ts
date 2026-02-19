@@ -73,7 +73,18 @@ const isoDurToSec = (duration) => {
 	(Number(s?.[10]) || 0) * 3600 +
 	(Number(s?.[12]) || 0) * 60 +
 	(Number(s?.[14]) || 0);
-};`;
+};
+
+const setCityFromInputs = (payload, inputs) => {
+	if (!inputs) return "*";
+	if (payload.context.version.startsWith("1")) {
+		payload.context.city = inputs.city_code ?? "*";
+	} else {
+		payload.context.location.city.code = inputs.city_code ?? "*";
+	}
+}
+
+`;
 
 export function convertToFlowConfig(config: MockPlaygroundConfigType) {
 	const flowConfig: any = {};
@@ -231,6 +242,7 @@ export async function generatePlaygroundConfigFromFlowConfig(
 	);
 	const mockRunner = new MockRunner(config);
 
+	let index = 0;
 	for (const step of flowConfig.sequence) {
 		if (
 			step.type === "HTML_FORM" ||
@@ -245,7 +257,17 @@ export async function generatePlaygroundConfigFromFlowConfig(
 			payloads.splice(stepPayload, 1); // remove used payload
 		}
 		const stepConfig = mockRunner.getDefaultStep(step.type, step.key);
-		stepConfig.mock.inputs = {};
+		if (index === 0) {
+			stepConfig.mock.defaultPayload = MockRunner.encodeBase64(
+				`async function generate(defaultPayload, sessionData) {
+  	setCityFromInputs(defaultPayload, sessionData.user_inputs);
+  return defaultPayload;
+  }`,
+			);
+			stepConfig.mock.inputs = cityInputs;
+		} else {
+			stepConfig.mock.inputs = {};
+		}
 		stepConfig.mock.defaultPayload = payload;
 		const findResponseFor = flowConfig.sequence.find(
 			(s) => s.pair === step.key,
@@ -256,3 +278,18 @@ export async function generatePlaygroundConfigFromFlowConfig(
 	}
 	return config;
 }
+
+const cityInputs = {
+	id: "ExampleInputId",
+	jsonSchema: {
+		$schema: "https://json-schema.org/draft-07/schema",
+		type: "object",
+		properties: {
+			city_code: {
+				type: "string",
+				description: "",
+			},
+		},
+		required: ["city_code"],
+	},
+};

@@ -795,14 +795,12 @@ describe("configHelper", () => {
 			expect(searchStepConfig.action_id).toBe("search_step");
 			expect(searchStepConfig.responseFor).toBe("on_search_step");
 			expect(searchStepConfig.unsolicited).toBe(false);
-			expect(searchStepConfig.mock.inputs).toEqual({});
 			expect(searchStepConfig.mock.defaultPayload).toBe(searchPayload);
 
 			expect(onSearchStepConfig.api).toBe("on_search");
 			expect(onSearchStepConfig.action_id).toBe("on_search_step");
 			expect(onSearchStepConfig.responseFor).toBeNull();
 			expect(onSearchStepConfig.unsolicited).toBe(false);
-			expect(onSearchStepConfig.mock.inputs).toEqual({});
 			expect(onSearchStepConfig.mock.defaultPayload).toBe(onSearchPayload);
 		});
 

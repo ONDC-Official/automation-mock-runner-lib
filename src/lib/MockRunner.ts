@@ -480,6 +480,9 @@ export class MockRunner {
 					bapUri: "$.context.bap_uri",
 					bppId: "$.context.bpp_id",
 					bppUri: "$.context.bpp_uri",
+					city_code: this.config.meta.version.startsWith("1")
+						? "$.context.city"
+						: "$.context.location.city.code",
 				},
 				inputs: {
 					id: "ExampleInputId",
@@ -627,11 +630,15 @@ export class MockRunner {
 		const version = this.config.meta?.version || "2.0.0";
 		const majorVersion = parseInt(version.split(".")[0], 10);
 
+		// set city code
+		const cityCode =
+			MockRunner.getIdFromSession(sessionData, "city_code") || "*";
+
 		if (majorVersion === 1) {
 			return {
 				...baseContext,
 				country: "IND",
-				city: "*",
+				city: cityCode,
 				core_version: version,
 			};
 		}
@@ -645,7 +652,7 @@ export class MockRunner {
 					code: "IND",
 				},
 				city: {
-					code: "*",
+					code: cityCode,
 				},
 			},
 		};
