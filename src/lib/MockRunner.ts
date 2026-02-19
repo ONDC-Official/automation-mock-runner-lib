@@ -632,7 +632,7 @@ export class MockRunner {
 
 		// set city code
 		const cityCode =
-			MockRunner.getIdFromSession(sessionData, "city_code") || "*";
+			MockRunner.getIdFromSession(sessionData, "city_code") ?? "*";
 
 		if (majorVersion === 1) {
 			return {
