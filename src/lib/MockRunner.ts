@@ -18,7 +18,7 @@ import { v4 as uuidv4 } from "uuid";
 
 export class MockRunner {
 	private config: MockPlaygroundConfigType;
-	private runner: BaseCodeRunner | undefined;
+	private static sharedRunner: BaseCodeRunner | undefined;
 	public logger: Logger;
 
 	constructor(
@@ -58,13 +58,14 @@ export class MockRunner {
 
 	public getRunnerInstance() {
 		this.logger.debug("Getting code runner instance");
-		if (!this.runner) {
-			this.runner = RunnerFactory.createRunner({}, this.logger);
+		if (!MockRunner.sharedRunner) {
+			MockRunner.sharedRunner = RunnerFactory.createRunner({}, this.logger);
 		}
 		this.logger.debug(
-			"Code runner instance obtained successfully: " + this.runner.toString(),
+			"Code runner instance obtained successfully: " +
+				MockRunner.sharedRunner.toString(),
 		);
-		return this.runner;
+		return MockRunner.sharedRunner;
 	}
 
 	public getConfig() {

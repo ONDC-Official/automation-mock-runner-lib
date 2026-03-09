@@ -48,6 +48,39 @@ describe("MockRunner", () => {
 			expect(mockRunner).toBeDefined();
 			expect(mockRunner).toBeInstanceOf(MockRunner);
 		});
+
+		it("should reuse the same BaseCodeRunner across MockRunner instances", async () => {
+			const baseConfig: MockPlaygroundConfigType = {
+				meta: {
+					domain: "ONDC:TRV14",
+					version: "2.0.0",
+					flowId: "singleton-test",
+				},
+				transaction_data: {
+					transaction_id: "11111111-1111-1111-1111-111111111111",
+					latest_timestamp: "1970-01-01T00:00:00.000Z",
+				},
+				steps: [],
+				transaction_history: [],
+				validationLib: "",
+				helperLib: "",
+			};
+
+			const firstRunner = new MockRunner(baseConfig, true);
+			firstRunner
+				.getConfig()
+				.steps.push(firstRunner.getDefaultStep("search", "search_0"));
+			const optimizedConfig = await createOptimizedMockConfig(
+				firstRunner.getConfig(),
+			);
+
+			const mockRunnerA = new MockRunner(optimizedConfig, true);
+			const mockRunnerB = new MockRunner(optimizedConfig, true);
+
+			expect(mockRunnerA.getRunnerInstance()).toBe(
+				mockRunnerB.getRunnerInstance(),
+			);
+		});
 	});
 
 	describe("Config Validation", () => {
