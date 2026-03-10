@@ -29,7 +29,7 @@ interface PooledWorker {
 	createdAt: number;
 }
 
-const DEFAULT_POOL_SIZE = 10;
+const DEFAULT_POOL_SIZE = 2;
 const MAX_EXECUTIONS_PER_WORKER = 100;
 const MAX_WORKER_AGE_MS = 10 * 60 * 1000; // 10 minutes
 

@@ -4,6 +4,7 @@
 
 import { createOptimizedMockConfig } from "../lib/configHelper";
 import { MockRunner } from "../lib/MockRunner";
+import { RunnerFactory } from "../lib/runners/runner-factory";
 import { MockPlaygroundConfigType } from "../lib/types/mock-config";
 
 describe("MockRunner", () => {
@@ -39,7 +40,12 @@ describe("MockRunner", () => {
 		}
 	});
 
-	afterEach(() => {
+	afterEach(async () => {
+		const sharedRunner = (MockRunner as any).sharedRunner;
+		if (sharedRunner?.terminate) {
+			await sharedRunner.terminate();
+		}
+		(MockRunner as any).sharedRunner = undefined;
 		jest.clearAllMocks();
 	});
 
@@ -80,6 +86,25 @@ describe("MockRunner", () => {
 			expect(mockRunnerA.getRunnerInstance()).toBe(
 				mockRunnerB.getRunnerInstance(),
 			);
+		});
+
+		it("should reuse singleton runner for runGetSave", async () => {
+			(MockRunner as any).sharedRunner = undefined;
+			const createRunnerSpy = jest.spyOn(RunnerFactory, "createRunner");
+
+			mockRunner.getRunnerInstance();
+
+			const getSaveFunction = MockRunner.encodeBase64(
+				`async function getSave(payload){ return payload.value; }`,
+			);
+			const result = await MockRunner.runGetSave(
+				{ value: "singleton-check" },
+				getSaveFunction,
+			);
+
+			expect(result.success).toBe(true);
+			expect(result.result).toBe("singleton-check");
+			expect(createRunnerSpy).toHaveBeenCalledTimes(1);
 		});
 	});
 

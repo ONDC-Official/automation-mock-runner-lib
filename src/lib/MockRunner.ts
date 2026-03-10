@@ -21,6 +21,13 @@ export class MockRunner {
 	private static sharedRunner: BaseCodeRunner | undefined;
 	public logger: Logger;
 
+	private static getSharedRunner(logger?: Logger): BaseCodeRunner {
+		if (!MockRunner.sharedRunner) {
+			MockRunner.sharedRunner = RunnerFactory.createRunner({}, logger);
+		}
+		return MockRunner.sharedRunner;
+	}
+
 	constructor(
 		config: MockPlaygroundConfigType,
 		skipValidation: boolean = false,
@@ -58,14 +65,11 @@ export class MockRunner {
 
 	public getRunnerInstance() {
 		this.logger.debug("Getting code runner instance");
-		if (!MockRunner.sharedRunner) {
-			MockRunner.sharedRunner = RunnerFactory.createRunner({}, this.logger);
-		}
+		const runner = MockRunner.getSharedRunner(this.logger);
 		this.logger.debug(
-			"Code runner instance obtained successfully: " +
-				MockRunner.sharedRunner.toString(),
+			"Code runner instance obtained successfully: " + runner.toString(),
 		);
-		return MockRunner.sharedRunner;
+		return runner;
 	}
 
 	public getConfig() {
@@ -770,7 +774,7 @@ export class MockRunner {
 
 	public static async runGetSave(payload: any, expression: string) {
 		const evalExpression = MockRunner.decodeBase64(expression);
-		const runner = RunnerFactory.createRunner();
+		const runner = MockRunner.getSharedRunner();
 		const schema = getFunctionSchema("getSave");
 		return await runner.execute(evalExpression, schema, [payload]);
 	}
