@@ -224,9 +224,6 @@ export async function generatePlaygroundConfigFromFlowConfig(
 	flowConfig: Flow,
 ) {
 	flowConfig = JSON.parse(JSON.stringify(flowConfig)) as Flow;
-	flowConfig.sequence = flowConfig.sequence.filter(
-		(step) => step.type !== "HTML_FORM" && step.type !== "DYNAMIC_FORM",
-	);
 	payloads = payloads.sort(
 		(a, b) =>
 			new Date(a.context.timestamp).getTime() -
@@ -244,38 +241,48 @@ export async function generatePlaygroundConfigFromFlowConfig(
 
 	let index = 0;
 	for (const step of flowConfig.sequence) {
-		if (
+		const isFormStep =
 			step.type === "HTML_FORM" ||
 			step.type === "DYNAMIC_FORM" ||
-			step.type === "FORM"
-		) {
-			continue;
-		}
-		let stepPayload = payloads.findIndex((p) => p.context.action === step.type);
-		const payload = stepPayload === -1 ? {} : payloads[stepPayload];
-		if (stepPayload !== -1) {
-			payloads.splice(stepPayload, 1); // remove used payload
-		}
-		const stepConfig = mockRunner.getDefaultStep(step.type, step.key);
-		if (index === 0) {
-			stepConfig.mock.generate = MockRunner.encodeBase64(
-				`async function generate(defaultPayload, sessionData) {
+			step.type === "FORM";
+
+		let stepConfig;
+		if (isFormStep) {
+			// HTML_FORM is not yet fully implemented — fall back to dynamic_form default
+			stepConfig = mockRunner.getDefaultStep(
+				step.type,
+				step.key,
+				"dynamic_form",
+			);
+		} else {
+			stepConfig = mockRunner.getDefaultStep(step.type, step.key);
+			if (index === 0) {
+				stepConfig.mock.generate = MockRunner.encodeBase64(
+					`async function generate(defaultPayload, sessionData) {
   	setCityFromInputs(defaultPayload, sessionData.user_inputs);
   return defaultPayload;
   }`,
+				);
+				stepConfig.mock.inputs = cityInputs;
+			} else {
+				stepConfig.mock.inputs = {};
+			}
+			const stepPayloadIndex = payloads.findIndex(
+				(p) => p.context.action === step.type,
 			);
-			stepConfig.mock.inputs = cityInputs;
-		} else {
-			stepConfig.mock.inputs = {};
+			if (stepPayloadIndex !== -1) {
+				stepConfig.mock.defaultPayload = payloads[stepPayloadIndex];
+				payloads.splice(stepPayloadIndex, 1); // remove used payload
+			}
+			index++;
 		}
-		stepConfig.mock.defaultPayload = payload;
+
 		const findResponseFor = flowConfig.sequence.find(
 			(s) => s.pair === step.key,
 		);
 		stepConfig.responseFor = findResponseFor ? findResponseFor.key : null;
 		stepConfig.unsolicited = step.unsolicited;
 		config.steps.push(stepConfig);
-		index++;
 	}
 	return config;
 }

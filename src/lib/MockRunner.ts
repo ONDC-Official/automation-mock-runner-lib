@@ -416,10 +416,7 @@ export class MockRunner {
 		actionId: string,
 		formType?: "dynamic_form" | "html_form",
 	): MockPlaygroundConfigType["steps"][0] {
-		if (formType === "html_form") {
-			throw new Error("HTML form generation is not implemented yet");
-		}
-		if (formType === "dynamic_form") {
+		if (formType === "dynamic_form" || formType === "html_form") {
 			return {
 				api: api,
 				action_id: actionId,
