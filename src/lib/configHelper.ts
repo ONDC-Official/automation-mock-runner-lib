@@ -14,6 +14,9 @@ export function createInitialMockConfig(
 			domain,
 			version,
 			flowId,
+			config_version: "0.0.0001",
+			description: "",
+			use_case_id: "",
 		},
 		transaction_data: {
 			transaction_id: uuidv4(),

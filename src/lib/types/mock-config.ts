@@ -8,6 +8,9 @@ export const MetaSchema = z.object({
 	version: z.string().min(1, "Version is required"),
 	flowId: z.string().min(1, "Flow ID is required"),
 	config_version: z.string().optional(),
+	description: z.string().optional(),
+	use_case_id: z.string().optional(),
+	flowName: z.string().optional(),
 });
 
 export const TransactionDataSchema = z.object({
@@ -46,6 +49,16 @@ export const PlaygroundActionStepSchema = z.object({
 		.optional()
 		.nullable(),
 	mock: MockConfigSchema,
+	examples: z
+		.array(
+			z.object({
+				name: z.string().min(1, "Example name is required"),
+				description: z.string().optional(),
+				payload: z.any(),
+				type: z.enum(["request", "response"]),
+			}),
+		)
+		.optional(),
 });
 
 export const TransactionHistoryItemSchema = z.object({

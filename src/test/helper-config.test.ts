@@ -465,6 +465,9 @@ describe("configHelper", () => {
 				domain: "ONDC:TRV14",
 				version: "2.0.0",
 				flowId: "test-flow",
+				config_version: "0.0.0001",
+				description: "",
+				use_case_id: "",
 			});
 		});
 
