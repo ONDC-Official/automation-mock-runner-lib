@@ -223,19 +223,18 @@ type PayloadType = {
  * const config = await generatePlaygroundConfigFromFlowConfig(payloads, flowConfig);
  * ```
  */
-export async function generatePlaygroundConfigFromFlowConfig(
+async function buildConfigFromFlowConfig(
 	payloads: PayloadType[],
 	flowConfig: Flow,
-) {
+	domain: string,
+	version: string,
+): Promise<MockPlaygroundConfigType> {
 	flowConfig = JSON.parse(JSON.stringify(flowConfig)) as Flow;
-	payloads = payloads.sort(
+	payloads = [...payloads].sort(
 		(a, b) =>
 			new Date(a.context.timestamp).getTime() -
 			new Date(b.context.timestamp).getTime(),
 	);
-	const domain = payloads[0].context.domain;
-	const version =
-		payloads[0].context.version || payloads[0].context.core_version || "1.0.0";
 	const config: MockPlaygroundConfigType = createInitialMockConfig(
 		domain,
 		version,
@@ -289,6 +288,30 @@ export async function generatePlaygroundConfigFromFlowConfig(
 		config.steps.push(stepConfig);
 	}
 	return config;
+}
+
+export async function generatePlaygroundConfigFromFlowConfig(
+	payloads: PayloadType[],
+	flowConfig: Flow,
+): Promise<MockPlaygroundConfigType> {
+	if (payloads.length === 0) {
+		throw new Error(
+			"payloads must not be empty. Use generatePlaygroundConfigFromFlowConfigWithMeta to supply domain and version explicitly.",
+		);
+	}
+	const domain = payloads[0].context.domain;
+	const version =
+		payloads[0].context.version || payloads[0].context.core_version || "1.0.0";
+	return buildConfigFromFlowConfig(payloads, flowConfig, domain, version);
+}
+
+export async function generatePlaygroundConfigFromFlowConfigWithMeta(
+	payloads: PayloadType[],
+	flowConfig: Flow,
+	domain: string,
+	version: string,
+): Promise<MockPlaygroundConfigType> {
+	return buildConfigFromFlowConfig(payloads, flowConfig, domain, version);
 }
 
 const cityInputs = {
