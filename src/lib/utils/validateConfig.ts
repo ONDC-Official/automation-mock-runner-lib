@@ -4,6 +4,7 @@ import {
 } from "../types/mock-config";
 import { z } from "zod";
 import { ValidationError } from "./errors";
+import Ajv from "ajv";
 
 export function validateConfigWithErrors(config: MockPlaygroundConfigType): {
 	success: boolean;
@@ -37,8 +38,18 @@ export function validateGoodConfig(config: MockPlaygroundConfigType): void {
 	const errors: string[] = [];
 
 	// 2. If inputs.id is present, both sampleData and jsonSchema must also be present
+	// Also validate sampleData against jsonSchema when both are present
+	const ajv = new Ajv();
 	config.steps.forEach((step, index) => {
 		const { id, sampleData, jsonSchema } = step.mock.inputs;
+		if (step.mock.inputs !== undefined) {
+			if (id === undefined || id === null) {
+				errors.push(
+					`steps[${index}] (action_id: "${step.action_id}"): inputs.id is required when inputs is defined`,
+				);
+			}
+		}
+
 		if (id !== undefined) {
 			if (sampleData === undefined || sampleData === null) {
 				errors.push(
@@ -49,6 +60,23 @@ export function validateGoodConfig(config: MockPlaygroundConfigType): void {
 				errors.push(
 					`steps[${index}] (action_id: "${step.action_id}"): inputs.jsonSchema is required when inputs.id is set`,
 				);
+			}
+		}
+
+		if (
+			sampleData !== undefined &&
+			sampleData !== null &&
+			jsonSchema !== undefined &&
+			jsonSchema !== null
+		) {
+			const validate = ajv.compile(jsonSchema);
+			const valid = validate(sampleData);
+			if (!valid && validate.errors) {
+				validate.errors.forEach((e) => {
+					errors.push(
+						`steps[${index}] (action_id: "${step.action_id}"): inputs.sampleData${e.dataPath} ${e.message}`,
+					);
+				});
 			}
 		}
 	});
