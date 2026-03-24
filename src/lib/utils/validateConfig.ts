@@ -74,7 +74,7 @@ export function validateGoodConfig(config: MockPlaygroundConfigType): void {
 			if (!valid && validate.errors) {
 				validate.errors.forEach((e) => {
 					errors.push(
-						`steps[${index}] (action_id: "${step.action_id}"): inputs.sampleData${e.dataPath} ${e.message}`,
+						`steps[${index}] (action_id: "${step.action_id}"): inputs.sampleData${e.instancePath} ${e.message}`,
 					);
 				});
 			}
