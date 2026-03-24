@@ -3,6 +3,7 @@ import { MockPlaygroundConfigType } from "./types/mock-config";
 import { v4 as uuidv4 } from "uuid";
 import { minify } from "terser";
 import { Flow } from "./types/flow-types";
+import { validateGoodConfig } from "./utils/validateConfig";
 export function createInitialMockConfig(
 	domain: string,
 	version: string,
@@ -301,3 +302,9 @@ const cityInputs = {
 		required: ["city_code"],
 	},
 };
+
+export function validateConfigForDeployment(
+	config: MockPlaygroundConfigType,
+): void {
+	validateGoodConfig(config);
+}

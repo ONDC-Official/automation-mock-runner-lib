@@ -523,6 +523,13 @@ export class MockRunner {
 						required: ["email", "password"],
 						additionalProperties: false,
 					},
+					sampleData: {
+						email: "john.doe@example.com",
+						age: 28,
+						password: "SecurePass1",
+						website: "https://example.com",
+						country: "US",
+					},
 				},
 			},
 		};
