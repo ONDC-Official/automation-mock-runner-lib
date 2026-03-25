@@ -228,6 +228,7 @@ async function buildConfigFromFlowConfig(
 	flowConfig: Flow,
 	domain: string,
 	version: string,
+	addInputs: boolean = true,
 ): Promise<MockPlaygroundConfigType> {
 	flowConfig = JSON.parse(JSON.stringify(flowConfig)) as Flow;
 	payloads = [...payloads].sort(
@@ -259,7 +260,7 @@ async function buildConfigFromFlowConfig(
 			);
 		} else {
 			stepConfig = mockRunner.getDefaultStep(step.type, step.key);
-			if (index === 0) {
+			if (index === 0 && addInputs) {
 				stepConfig.mock.generate = MockRunner.encodeBase64(
 					`async function generate(defaultPayload, sessionData) {
   	setCityFromInputs(defaultPayload, sessionData.user_inputs);
@@ -311,7 +312,13 @@ export async function generatePlaygroundConfigFromFlowConfigWithMeta(
 	domain: string,
 	version: string,
 ): Promise<MockPlaygroundConfigType> {
-	return buildConfigFromFlowConfig(payloads, flowConfig, domain, version);
+	return buildConfigFromFlowConfig(
+		payloads,
+		flowConfig,
+		domain,
+		version,
+		false,
+	);
 }
 
 const cityInputs = {
