@@ -40,7 +40,10 @@ export function validateGoodConfig(config: MockPlaygroundConfigType): void {
 		const { id, sampleData, jsonSchema } = step.mock.inputs;
 		const label = `steps[${index}] (action_id: "${step.action_id}")`;
 
-		if (step.mock.inputs !== undefined) {
+		if (
+			step.mock.inputs !== undefined &&
+			Object.keys(step.mock.inputs).length > 0
+		) {
 			if (id === undefined || id === null) {
 				errors.push(
 					`  • ${label}: inputs.id is required when inputs is defined`,
