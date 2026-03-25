@@ -1,8 +1,8 @@
 import {
-	MockPlaygroundConfigType,
 	MockPlaygroundConfigSchema,
+	MockPlaygroundConfigType,
 } from "../types/mock-config";
-import { z } from "zod";
+import z from "zod";
 import { ValidationError } from "./errors";
 import Ajv from "ajv";
 
@@ -14,10 +14,7 @@ export function validateConfigWithErrors(config: MockPlaygroundConfigType): {
 	if (result.success) {
 		return { success: true };
 	} else {
-		return {
-			success: false,
-			errors: result.error.issues,
-		};
+		return { success: false, errors: result.error.issues };
 	}
 }
 
@@ -26,10 +23,10 @@ export function validateGoodConfig(config: MockPlaygroundConfigType): void {
 	const baseResult = validateConfigWithErrors(config);
 	if (!baseResult.success && baseResult.errors) {
 		const messages = baseResult.errors.map(
-			(e) => `[${e.path.join(".") || "root"}] ${e.message}`,
+			(e) => `  • [${e.path.join(".") || "root"}]: ${e.message}`,
 		);
 		throw new ValidationError(
-			`Config schema validation failed with ${messages.length} error(s)`,
+			`Schema validation failed — ${messages.length} issue(s):\n\n${messages.join("\n")}\n`,
 			messages,
 			{ flowId: config?.meta?.flowId },
 		);
@@ -37,15 +34,16 @@ export function validateGoodConfig(config: MockPlaygroundConfigType): void {
 
 	const errors: string[] = [];
 
-	// 2. If inputs.id is present, both sampleData and jsonSchema must also be present
-	// Also validate sampleData against jsonSchema when both are present
+	// 2. inputs validation
 	const ajv = new Ajv();
 	config.steps.forEach((step, index) => {
 		const { id, sampleData, jsonSchema } = step.mock.inputs;
+		const label = `steps[${index}] (action_id: "${step.action_id}")`;
+
 		if (step.mock.inputs !== undefined) {
 			if (id === undefined || id === null) {
 				errors.push(
-					`steps[${index}] (action_id: "${step.action_id}"): inputs.id is required when inputs is defined`,
+					`  • ${label}: inputs.id is required when inputs is defined`,
 				);
 			}
 		}
@@ -53,44 +51,31 @@ export function validateGoodConfig(config: MockPlaygroundConfigType): void {
 		if (id !== undefined) {
 			if (sampleData === undefined || sampleData === null) {
 				errors.push(
-					`steps[${index}] (action_id: "${step.action_id}"): inputs.sampleData is required when inputs.id is set`,
+					`  • ${label}: inputs.sampleData is required when inputs.id is set`,
 				);
 			}
 			if (jsonSchema === undefined || jsonSchema === null) {
 				errors.push(
-					`steps[${index}] (action_id: "${step.action_id}"): inputs.jsonSchema is required when inputs.id is set`,
+					`  • ${label}: inputs.jsonSchema is required when inputs.id is set`,
 				);
 			}
 		}
 
-		if (
-			sampleData !== undefined &&
-			sampleData !== null &&
-			jsonSchema !== undefined &&
-			jsonSchema !== null
-		) {
+		if (sampleData != null && jsonSchema != null) {
 			const validate = ajv.compile(jsonSchema);
-			const valid = validate(sampleData);
-			if (!valid && validate.errors) {
+			if (!validate(sampleData) && validate.errors) {
 				validate.errors.forEach((e) => {
 					errors.push(
-						`steps[${index}] (action_id: "${step.action_id}"): inputs.sampleData${e.instancePath} ${e.message}`,
+						`  • ${label}: inputs.sampleData${e.instancePath} ${e.message}`,
 					);
 				});
 			}
 		}
 	});
 
-	// 3. Length of steps must equal length of transaction_history
-	// if (config.steps.length !== config.transaction_history.length) {
-	// 	errors.push(
-	// 		`steps length (${config.steps.length}) must equal transaction_history length (${config.transaction_history.length})`,
-	// 	);
-	// }
-
 	if (errors.length > 0) {
 		throw new ValidationError(
-			`Config validation failed with ${errors.length} error(s)`,
+			`Config validation failed — ${errors.length} error(s):\n\n${errors.join("\n")}\n`,
 			errors,
 			{ flowId: config.meta.flowId },
 		);
