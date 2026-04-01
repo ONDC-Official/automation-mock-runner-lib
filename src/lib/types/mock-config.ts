@@ -32,6 +32,7 @@ export const MockConfigSchema = z.object({
 		id: z.string().min(1, "Input ID is required").optional(),
 		jsonSchema: z.any().optional(),
 		sampleData: z.any().optional(),
+		oldInputs: z.any().optional(),
 	}),
 	formHtml: z.base64().optional(),
 });

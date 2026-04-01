@@ -148,6 +148,10 @@ export function convertToFlowConfig(config: MockPlaygroundConfigType) {
 			];
 		}
 
+		if (step.mock.inputs?.oldInputs) {
+			flowStep.input = step.mock.inputs.oldInputs;
+		}
+
 		flowConfig.sequence.push(flowStep);
 		index++;
 	}
@@ -258,6 +262,7 @@ async function buildConfigFromFlowConfig(
 				step.key,
 				"dynamic_form",
 			);
+			stepConfig.mock.inputs.oldInputs = step.input;
 		} else {
 			stepConfig = mockRunner.getDefaultStep(step.type, step.key);
 			if (index === 0 && addInputs) {
@@ -270,6 +275,7 @@ async function buildConfigFromFlowConfig(
 				stepConfig.mock.inputs = cityInputs;
 			} else {
 				stepConfig.mock.inputs = {};
+				stepConfig.mock.inputs.oldInputs = step.input;
 			}
 			const stepPayloadIndex = payloads.findIndex(
 				(p) => p.context.action === step.type,
