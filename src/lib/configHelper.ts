@@ -299,6 +299,7 @@ async function buildConfigFromFlowConfig(
 					stepConfig.mock.inputs = step.input[0];
 				} else {
 					stepConfig.mock.inputs.oldInputs = step.input;
+					stepConfig.mock.inputs.id = `old_inputs`;
 				}
 			}
 			const stepPayloadIndex = payloads.findIndex(

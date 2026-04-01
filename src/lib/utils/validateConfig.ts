@@ -36,9 +36,14 @@ export function validateGoodConfig(config: MockPlaygroundConfigType): void {
 
 	// 2. inputs validation
 	const ajv = new Ajv();
-	config.steps.forEach((step, index) => {
+	for (let index = 0; index < config.steps.length; index++) {
+		const step = config.steps[index];
 		const { id, sampleData, jsonSchema } = step.mock.inputs;
 		const label = `steps[${index}] (action_id: "${step.action_id}")`;
+
+		if (step.mock.inputs.oldInputs) {
+			continue;
+		}
 
 		if (
 			step.mock.inputs !== undefined &&
@@ -74,7 +79,7 @@ export function validateGoodConfig(config: MockPlaygroundConfigType): void {
 				});
 			}
 		}
-	});
+	}
 
 	if (errors.length > 0) {
 		throw new ValidationError(
