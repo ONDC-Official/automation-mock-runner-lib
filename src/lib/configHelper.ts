@@ -295,7 +295,11 @@ async function buildConfigFromFlowConfig(
 				stepConfig.mock.inputs = cityInputs;
 			} else {
 				stepConfig.mock.inputs = {};
-				stepConfig.mock.inputs.oldInputs = step.input;
+				if (step.input.jsonSchema) {
+					stepConfig.mock.inputs = step.input;
+				} else {
+					stepConfig.mock.inputs.oldInputs = step.input;
+				}
 			}
 			const stepPayloadIndex = payloads.findIndex(
 				(p) => p.context.action === step.type,
