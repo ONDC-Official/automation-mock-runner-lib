@@ -122,6 +122,26 @@ export function convertToFlowConfig(config: MockPlaygroundConfigType) {
 					},
 				],
 			};
+		} else if (step.api === "HTML_FORM") {
+			flowStep = {
+				key: step.action_id,
+				type: "HTML_FORM",
+				owner: step.owner,
+				description: step.description || "",
+				label: step.description || "FORM",
+				unsolicited: step.unsolicited,
+				pair: pair,
+				repeat: step.repeatCount || 1,
+				input: [
+					{
+						name: "form_submission_id",
+						label: "Enter form submission ID",
+						type: "HTML_FORM",
+						payloadField: "form_submission_id",
+						reference: `$.reference_data.${step.action_id}`,
+					},
+				],
+			};
 		} else {
 			flowStep = {
 				key: step.action_id,
