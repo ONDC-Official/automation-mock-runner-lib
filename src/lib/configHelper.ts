@@ -283,6 +283,7 @@ async function buildConfigFromFlowConfig(
 				"dynamic_form",
 			);
 			stepConfig.mock.inputs.oldInputs = step.input;
+			stepConfig.owner = step.owner;
 		} else {
 			stepConfig = mockRunner.getDefaultStep(step.type, step.key);
 			if (index === 0 && addInputs) {
