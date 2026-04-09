@@ -47,6 +47,7 @@ export function validateGoodConfig(config: MockPlaygroundConfigType): void {
 
 		if (
 			step.mock.inputs !== undefined &&
+			step.mock.inputs.oldInputs === undefined &&
 			Object.keys(step.mock.inputs).length > 0
 		) {
 			if (id === undefined || id === null) {
@@ -56,7 +57,7 @@ export function validateGoodConfig(config: MockPlaygroundConfigType): void {
 			}
 		}
 
-		if (id !== undefined) {
+		if (id !== undefined && step.mock.inputs.oldInputs === undefined) {
 			if (sampleData === undefined || sampleData === null) {
 				errors.push(
 					`  • ${label}: inputs.sampleData is required when inputs.id is set`,

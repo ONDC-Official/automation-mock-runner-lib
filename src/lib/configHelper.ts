@@ -298,7 +298,7 @@ async function buildConfigFromFlowConfig(
 				stepConfig.mock.inputs = {};
 				if (step.input && step.input.length > 0 && step.input[0].jsonSchema) {
 					stepConfig.mock.inputs = step.input[0];
-				} else {
+				} else if (step.input && step.input.length > 0) {
 					stepConfig.mock.inputs.oldInputs = step.input;
 					stepConfig.mock.inputs.id = `old_inputs`;
 				}
