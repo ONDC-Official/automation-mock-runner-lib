@@ -320,6 +320,7 @@ async function buildConfigFromFlowConfig(
 		stepConfig.unsolicited = step.unsolicited;
 		config.steps.push(stepConfig);
 	}
+	config.meta.description = flowConfig.description || "";
 	return config;
 }
 
