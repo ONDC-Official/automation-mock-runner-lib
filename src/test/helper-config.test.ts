@@ -787,9 +787,7 @@ describe("configHelper", () => {
 
 			expect(config.meta.domain).toBe("ONDC:TRV14");
 			expect(config.meta.version).toBe("1.5.0");
-			expect(config.meta.flowId).toBe(
-				"sample_flow_logs_flow_ONDC:TRV14_v1.5.0",
-			);
+			expect(config.meta.flowId).toBe("sample_flow");
 
 			expect(config.steps).toHaveLength(2);
 			const [searchStepConfig, onSearchStepConfig] = config.steps;
@@ -840,9 +838,7 @@ describe("configHelper", () => {
 
 			expect(config.meta.domain).toBe("ONDC:FIS12");
 			expect(config.meta.version).toBe("1.0.0");
-			expect(config.meta.flowId).toBe(
-				"core_version_flow_logs_flow_ONDC:FIS12_v1.0.0",
-			);
+			expect(config.meta.flowId).toBe("core_version_flow");
 		});
 
 		it("should handle multiple search requests with different timestamps interspersed with on_search responses", async () => {

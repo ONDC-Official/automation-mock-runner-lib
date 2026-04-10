@@ -263,7 +263,7 @@ async function buildConfigFromFlowConfig(
 	const config: MockPlaygroundConfigType = createInitialMockConfig(
 		domain,
 		version,
-		`${flowConfig.id}_logs_flow_${domain}_v${version}`,
+		`${flowConfig.id}`,
 	);
 	const mockRunner = new MockRunner(config);
 
