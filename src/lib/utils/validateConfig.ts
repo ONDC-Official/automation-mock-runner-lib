@@ -58,11 +58,11 @@ export function validateGoodConfig(config: MockPlaygroundConfigType): void {
 		}
 
 		if (id !== undefined && step.mock.inputs.oldInputs === undefined) {
-			if (sampleData === undefined || sampleData === null) {
-				errors.push(
-					`  • ${label}: inputs.sampleData is required when inputs.id is set`,
-				);
-			}
+			// if (sampleData === undefined || sampleData === null) {
+			// 	errors.push(
+			// 		`  • ${label}: inputs.sampleData is required when inputs.id is set`,
+			// 	);
+			// }
 			if (jsonSchema === undefined || jsonSchema === null) {
 				errors.push(
 					`  • ${label}: inputs.jsonSchema is required when inputs.id is set`,
@@ -71,14 +71,14 @@ export function validateGoodConfig(config: MockPlaygroundConfigType): void {
 		}
 
 		if (sampleData != null && jsonSchema != null) {
-			const validate = ajv.compile(jsonSchema);
-			if (!validate(sampleData) && validate.errors) {
-				validate.errors.forEach((e) => {
-					errors.push(
-						`  • ${label}: inputs.sampleData${e.instancePath} ${e.message}`,
-					);
-				});
-			}
+			// const validate = ajv.compile(jsonSchema);
+			// if (!validate(sampleData) && validate.errors) {
+			// 	validate.errors.forEach((e) => {
+			// 		errors.push(
+			// 			`  • ${label}: inputs.sampleData${e.instancePath} ${e.message}`,
+			// 		);
+			// 	});
+			// }
 		}
 	}
 
