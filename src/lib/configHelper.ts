@@ -272,7 +272,8 @@ async function buildConfigFromFlowConfig(
 		const isFormStep =
 			step.type === "HTML_FORM" ||
 			step.type === "DYNAMIC_FORM" ||
-			step.type === "FORM";
+			step.type === "FORM" ||
+			step.type === "HTML_FORM_MULTI";
 
 		let stepConfig;
 		if (isFormStep) {
