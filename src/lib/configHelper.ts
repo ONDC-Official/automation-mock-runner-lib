@@ -102,6 +102,19 @@ export function convertToFlowConfig(config: MockPlaygroundConfigType) {
 			null;
 
 		let flowStep: any = {};
+		const isFormStep = ["HTML_FORM", "DYNAMIC_FORM", "HTML_FORM_MULTI"];
+
+		// Check if previous step was a form step
+		const previousStep = index > 0 ? config.steps[index - 1] : null;
+		const isPreviousStepForm =
+			previousStep !== null && isFormStep.includes(previousStep.api);
+
+		// Check if current step has no inputs
+		const hasNoInputs =
+			step.mock.inputs === undefined ||
+			step.mock.inputs === null ||
+			Object.keys(step.mock.inputs).length === 0;
+
 		if (step.api === "dynamic_form") {
 			flowStep = {
 				key: step.action_id,
@@ -154,6 +167,7 @@ export function convertToFlowConfig(config: MockPlaygroundConfigType) {
 				repeat: step.repeatCount || 1,
 			};
 		}
+
 		if (
 			step.mock.inputs !== undefined &&
 			step.mock.inputs !== null &&
@@ -172,12 +186,16 @@ export function convertToFlowConfig(config: MockPlaygroundConfigType) {
 			flowStep.input = step.mock.inputs.oldInputs;
 		}
 
+		// Add force_proceed if previous step was a form and current step has no inputs
+		if (isPreviousStepForm && hasNoInputs) {
+			flowStep.force_proceed = true;
+		}
+
 		flowConfig.sequence.push(flowStep);
 		index++;
 	}
 	return flowConfig;
 }
-
 export async function createOptimizedMockConfig(
 	config: MockPlaygroundConfigType,
 ): Promise<MockPlaygroundConfigType> {
