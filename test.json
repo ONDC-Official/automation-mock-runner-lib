@@ -24,13 +24,22 @@
     },
     {
       "key": "test_form",
-      "type": "html_form",
+      "type": "HTML_FORM",
       "owner": "BPP",
       "description": "please add relevant description",
-      "expect": false,
+      "label": "please add relevant description",
       "unsolicited": false,
       "pair": null,
-      "repeat": 1
+      "repeat": 1,
+      "input": [
+        {
+          "name": "form_submission_id",
+          "label": "Enter form submission ID",
+          "type": "HTML_FORM",
+          "payloadField": "form_submission_id",
+          "reference": "$.reference_data.test_form"
+        }
+      ]
     },
     {
       "key": "update",
