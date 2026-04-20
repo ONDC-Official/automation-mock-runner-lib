@@ -1,248 +1,30 @@
 {
-  "id": "Purchase_Finance_With_AA",
+  "id": "form_test",
   "description": "",
   "sequence": [
     {
-      "key": "search1_purchase_finance",
+      "key": "search",
       "type": "search",
       "owner": "BAP",
       "description": "please add relevant description",
       "expect": true,
       "unsolicited": false,
-      "pair": "on_search1_purchase_finance",
+      "pair": "on_search",
       "repeat": 1
     },
     {
-      "key": "on_search1_purchase_finance",
+      "key": "on_search",
       "type": "on_search",
-      "owner": "BPP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": null,
-      "repeat": 1
-    },
-    {
-      "key": "product_details_form",
-      "type": "HTML_FORM",
-      "owner": "BPP",
-      "description": "please add relevant description",
-      "label": "please add relevant description",
-      "unsolicited": false,
-      "pair": null,
-      "repeat": 1,
-      "input": [
-        {
-          "name": "form_submission_id",
-          "label": "Enter Form Submission id",
-          "type": "HTML_FORM",
-          "reference": "$.reference_data.product_details_form"
-        }
-      ]
-    },
-    {
-      "key": "search2_purchase_finance",
-      "type": "search",
-      "owner": "BAP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": "on_search2_purchase_finance",
-      "repeat": 1,
-      "input": [
-        {
-          "name": "search_input",
-          "label": "Enter Search Input",
-          "type": "fis12_search_pl"
-        }
-      ]
-    },
-    {
-      "key": "on_search2_purchase_finance",
-      "type": "on_search",
-      "owner": "BPP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": null,
-      "repeat": 1
-    },
-    {
-      "key": "personal_details_information_form",
-      "type": "HTML_FORM",
-      "owner": "BPP",
-      "description": "please add relevant description",
-      "label": "please add relevant description",
-      "unsolicited": false,
-      "pair": null,
-      "repeat": 1,
-      "input": [
-        {
-          "name": "form_submission_id",
-          "label": "Enter Form Submission id",
-          "type": "HTML_FORM",
-          "reference": "$.reference_data.personal_details_information_form"
-        }
-      ]
-    },
-    {
-      "key": "search3_purchase_finance",
-      "type": "search",
-      "owner": "BAP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": "on_search5_purchase_finance",
-      "repeat": 1,
-      "force_proceed": true
-    },
-    {
-      "key": "on_search5_purchase_finance",
-      "type": "on_search",
-      "owner": "BPP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": null,
-      "repeat": 1
-    },
-    {
-      "key": "search4_purchase_finance",
-      "type": "search",
-      "owner": "BAP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": "on_search6_purchase_finance",
-      "repeat": 1,
-      "input": [
-        {
-          "name": "finvu_verification",
-          "label": "Complete Account Aggregator Verification",
-          "type": "FINVU_REDIRECT",
-          "payloadField": "$.context.aa_consent_verified"
-        }
-      ]
-    },
-    {
-      "key": "on_search6_purchase_finance",
-      "type": "on_search",
-      "owner": "BPP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": null,
-      "repeat": 1
-    },
-    {
-      "key": "select_purchase_finance",
-      "type": "select",
-      "owner": "BAP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": "on_select_purchase_finance",
-      "repeat": 1,
-      "input": [
-        {
-          "name": "select_input",
-          "label": "Enter",
-          "type": "fis12_select_pl"
-        }
-      ]
-    },
-    {
-      "key": "on_select_purchase_finance",
-      "type": "on_select",
-      "owner": "BPP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": null,
-      "repeat": 1
-    },
-    {
-      "key": "down_payment_form",
-      "type": "HTML_FORM",
-      "owner": "BPP",
-      "description": "please add relevant description",
-      "label": "please add relevant description",
-      "unsolicited": false,
-      "pair": null,
-      "repeat": 1,
-      "input": [
-        {
-          "name": "form_submission_id",
-          "label": "Enter Form Submission id",
-          "type": "HTML_FORM",
-          "reference": "$.reference_data.down_payment_form"
-        }
-      ]
-    },
-    {
-      "key": "select1_purchase_finance",
-      "type": "select",
-      "owner": "BAP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": "on_select1_purchase_finance",
-      "repeat": 1,
-      "force_proceed": true
-    },
-    {
-      "key": "on_select1_purchase_finance",
-      "type": "on_select",
-      "owner": "BPP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": null,
-      "repeat": 1
-    },
-    {
-      "key": "Ekyc_details_verification_status",
-      "type": "DYNAMIC_FORM",
-      "owner": "BPP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": null,
-      "repeat": 1,
-      "input": [
-        {
-          "name": "form_submission_id",
-          "label": "Enter Form Submission id",
-          "type": "DYNAMIC_FORM",
-          "payloadField": "form_submission_id",
-          "reference": "$.reference_data.Ekyc_details_verification_status"
-        }
-      ]
-    },
-    {
-      "key": "on_status_unsolicited",
-      "type": "on_status",
       "owner": "BPP",
       "description": "please add relevant description",
       "expect": false,
       "unsolicited": true,
       "pair": null,
-      "repeat": 1,
-      "force_proceed": true
-    },
-    {
-      "key": "select2_purchase_finance",
-      "type": "select",
-      "owner": "BAP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": "on_select2_purchase_finance",
       "repeat": 1
     },
     {
-      "key": "on_select2_purchase_finance",
-      "type": "on_select",
+      "key": "test_form",
+      "type": "html_form",
       "owner": "BPP",
       "description": "please add relevant description",
       "expect": false,
@@ -251,172 +33,63 @@
       "repeat": 1
     },
     {
-      "key": "init1_purchase_finance",
-      "type": "init",
-      "owner": "BAP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": "on_init1_purchase_finance",
-      "repeat": 1
-    },
-    {
-      "key": "on_init1_purchase_finance",
-      "type": "on_init",
-      "owner": "BPP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": null,
-      "repeat": 1
-    },
-    {
-      "key": "Emanadate_verification_status",
-      "type": "DYNAMIC_FORM",
-      "owner": "BPP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": null,
-      "repeat": 1,
-      "input": [
-        {
-          "name": "form_submission_id",
-          "label": "Enter Form Submission id",
-          "type": "DYNAMIC_FORM",
-          "reference": "$.reference_data.Emanadate_verification_status"
-        }
-      ]
-    },
-    {
-      "key": "on_status_unsolicited",
-      "type": "on_status",
-      "owner": "BPP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": true,
-      "pair": null,
-      "repeat": 1,
-      "force_proceed": true
-    },
-    {
-      "key": "init2_purchase_finance",
-      "type": "init",
-      "owner": "BAP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": "on_init2_purchase_finance",
-      "repeat": 1
-    },
-    {
-      "key": "on_init2_purchase_finance",
-      "type": "on_init",
-      "owner": "BPP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": null,
-      "repeat": 1
-    },
-    {
-      "key": "E_sign_verification_status",
-      "type": "DYNAMIC_FORM",
-      "owner": "BPP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": null,
-      "repeat": 1,
-      "input": [
-        {
-          "name": "form_submission_id",
-          "label": "Enter Form Submission id",
-          "type": "DYNAMIC_FORM",
-          "reference": "$.reference_data.E_sign_verification_status"
-        }
-      ]
-    },
-    {
-      "key": "on_status_unsolicited",
-      "type": "on_status",
-      "owner": "BPP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": true,
-      "pair": null,
-      "repeat": 1,
-      "force_proceed": true
-    },
-    {
-      "key": "init3_purchase_finance",
-      "type": "init",
-      "owner": "BAP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": "on_init3_purchase_finance",
-      "repeat": 1
-    },
-    {
-      "key": "on_init3_purchase_finance",
-      "type": "on_init",
-      "owner": "BPP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": null,
-      "repeat": 1
-    },
-    {
-      "key": "confirm_purchase_finance",
-      "type": "confirm",
-      "owner": "BAP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": "on_confirm_purchase_finance",
-      "repeat": 1
-    },
-    {
-      "key": "on_confirm_purchase_finance",
-      "type": "on_confirm",
-      "owner": "BPP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
-      "pair": null,
-      "repeat": 1
-    },
-    {
-      "key": "update_purchase_finance",
+      "key": "update",
       "type": "update",
       "owner": "BAP",
       "description": "please add relevant description",
       "expect": false,
       "unsolicited": false,
-      "pair": "on_update_purchase_finance",
-      "repeat": 1
-    },
-    {
-      "key": "on_update_purchase_finance",
-      "type": "on_update",
-      "owner": "BPP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": false,
       "pair": null,
-      "repeat": 1
-    },
-    {
-      "key": "on_update1_unsolicited_purchase_finance",
-      "type": "on_update",
-      "owner": "BPP",
-      "description": "please add relevant description",
-      "expect": false,
-      "unsolicited": true,
-      "pair": null,
-      "repeat": 1
+      "repeat": 1,
+      "input": [
+        {
+          "name": "ExampleInputId",
+          "type": "ExampleInputId",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "format": "email",
+                "minLength": 5,
+                "maxLength": 50,
+                "description": "User's email address"
+              },
+              "age": {
+                "type": "integer",
+                "minimum": 18,
+                "maximum": 120,
+                "description": "User's age"
+              },
+              "password": {
+                "type": "string",
+                "minLength": 8,
+                "pattern": "^(?=.*[A-Z])(?=.*[0-9]).+$",
+                "description": "Must contain uppercase and number"
+              },
+              "website": {
+                "type": "string",
+                "format": "uri"
+              },
+              "country": {
+                "type": "string",
+                "enum": [
+                  "US",
+                  "UK",
+                  "CA",
+                  "AU"
+                ]
+              }
+            },
+            "required": [
+              "email",
+              "password"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ]
     }
   ]
 }

@@ -102,7 +102,13 @@ export function convertToFlowConfig(config: MockPlaygroundConfigType) {
 			null;
 
 		let flowStep: any = {};
-		const isFormStep = ["HTML_FORM", "DYNAMIC_FORM", "HTML_FORM_MULTI"];
+		const isFormStep = [
+			"HTML_FORM",
+			"DYNAMIC_FORM",
+			"HTML_FORM_MULTI",
+			"dynamic_form",
+			"html_form",
+		];
 
 		// Check if previous step was a form step
 		const previousStep = index > 0 ? config.steps[index - 1] : null;
@@ -135,7 +141,7 @@ export function convertToFlowConfig(config: MockPlaygroundConfigType) {
 					},
 				],
 			};
-		} else if (step.api === "HTML_FORM") {
+		} else if (step.api === "HTML_FORM" || step.api === "html_form") {
 			flowStep = {
 				key: step.action_id,
 				type: "HTML_FORM",
