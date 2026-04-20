@@ -88,19 +88,20 @@ export class MockRunner {
 		const startTime = Date.now();
 
 		try {
+			const baseActionId = MockRunner.resolveBaseActionId(actionId);
 			this.logger.logExecution(executionId, "Starting payload generation", {
 				actionId,
 				inputKeys: Object.keys(inputs),
 			});
 
-			const step = this.config.steps.find((s) => s.action_id === actionId);
+			const step = this.config.steps.find((s) => s.action_id === baseActionId);
 			if (!step) {
 				const availableActions = this.config.steps.map((s) => s.action_id);
 				throw new ActionNotFoundError(actionId, availableActions);
 			}
 
 			const index = this.config.steps.findIndex(
-				(s) => s.action_id === actionId,
+				(s) => s.action_id === baseActionId,
 			);
 
 			// Deep clone to avoid mutations
@@ -187,6 +188,7 @@ export class MockRunner {
 		const executionId = this.logger.createExecutionContext(actionId);
 		const startTime = Date.now();
 		try {
+			const baseActionId = MockRunner.resolveBaseActionId(actionId);
 			this.logger.logExecution(
 				executionId,
 				"Starting payload generation with session data",
@@ -196,14 +198,14 @@ export class MockRunner {
 				},
 			);
 
-			const step = this.config.steps.find((s) => s.action_id === actionId);
+			const step = this.config.steps.find((s) => s.action_id === baseActionId);
 			if (!step) {
 				const availableActions = this.config.steps.map((s) => s.action_id);
 				throw new ActionNotFoundError(actionId, availableActions);
 			}
 
 			const index = this.config.steps.findIndex(
-				(s) => s.action_id === actionId,
+				(s) => s.action_id === baseActionId,
 			);
 
 			// Deep clone to avoid mutations
@@ -282,12 +284,13 @@ export class MockRunner {
 		targetPayload: any,
 	): Promise<ExecutionResult> {
 		try {
-			const step = this.config.steps.find((s) => s.action_id === actionId);
+			const baseActionId = MockRunner.resolveBaseActionId(actionId);
+			const step = this.config.steps.find((s) => s.action_id === baseActionId);
 			if (!step) {
 				throw new Error(`Action step with ID ${actionId} not found.`);
 			}
 			const index = this.config.steps.findIndex(
-				(s) => s.action_id === actionId,
+				(s) => s.action_id === baseActionId,
 			);
 			const schema = getFunctionSchema("validate");
 			const sessionData = await this.getSessionDataUpToStep(index);
@@ -319,7 +322,8 @@ export class MockRunner {
 		sessionData: any,
 	) {
 		try {
-			const step = this.config.steps.find((s) => s.action_id === actionId);
+			const baseActionId = MockRunner.resolveBaseActionId(actionId);
+			const step = this.config.steps.find((s) => s.action_id === baseActionId);
 			if (!step) {
 				throw new Error(`Action step with ID ${actionId} not found.`);
 			}
@@ -348,12 +352,13 @@ export class MockRunner {
 
 	public async runMeetRequirements(actionId: string) {
 		try {
-			const step = this.config.steps.find((s) => s.action_id === actionId);
+			const baseActionId = MockRunner.resolveBaseActionId(actionId);
+			const step = this.config.steps.find((s) => s.action_id === baseActionId);
 			if (!step) {
 				throw new Error(`Action step with ID ${actionId} not found.`);
 			}
 			const index = this.config.steps.findIndex(
-				(s) => s.action_id === actionId,
+				(s) => s.action_id === baseActionId,
 			);
 			const schema = getFunctionSchema("meetsRequirements");
 			const sessionData = await this.getSessionDataUpToStep(index);
@@ -384,7 +389,8 @@ export class MockRunner {
 		sessionData: any,
 	) {
 		try {
-			const step = this.config.steps.find((s) => s.action_id === actionId);
+			const baseActionId = MockRunner.resolveBaseActionId(actionId);
+			const step = this.config.steps.find((s) => s.action_id === baseActionId);
 			if (!step) {
 				throw new Error(`Action step with ID ${actionId} not found.`);
 			}
@@ -416,6 +422,7 @@ export class MockRunner {
 		actionId: string,
 		formType?: "dynamic_form" | "html_form",
 	): MockPlaygroundConfigType["steps"][0] {
+		const baseActionId = MockRunner.resolveBaseActionId(actionId);
 		if (formType === "dynamic_form" || formType === "html_form") {
 			return {
 				api: api,
@@ -536,7 +543,11 @@ export class MockRunner {
 	}
 	public generateContext(actionId: string, action: string, sessionData?: any) {
 		// Find the step configuration for this action
-		const step = this.config.steps.find((s) => s.action_id === actionId);
+		// GENERATED#1#on_search_full_page_gcr
+		// get the last by splitting on # and taking the last part
+		const baseActionId = MockRunner.resolveBaseActionId(actionId);
+
+		const step = this.config.steps.find((s) => s.action_id === baseActionId);
 
 		// Determine the message_id based on responseFor logic
 		let messageId = uuidv4();
@@ -793,6 +804,10 @@ export class MockRunner {
 			[...binaryString].map((char) => char.charCodeAt(0)),
 		);
 		return new TextDecoder().decode(bytes);
+	}
+
+	private static resolveBaseActionId(actionId: string): string {
+		return actionId.split("#").slice(-1)[0];
 	}
 
 	private static getIdFromSession(

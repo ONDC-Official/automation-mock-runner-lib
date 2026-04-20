@@ -772,4 +772,106 @@ describe("MockRunner", () => {
 			expect(result.result.message.discountPercent).toBe(20);
 		});
 	});
+
+	describe("baseActionId extraction (GENERATED# prefix support)", () => {
+		let prefixedRunner: MockRunner;
+
+		beforeEach(async () => {
+			const baseConfig: MockPlaygroundConfigType = {
+				meta: {
+					domain: "ONDC:TRV14",
+					version: "2.0.0",
+					flowId: "prefix-test",
+				},
+				transaction_data: {
+					transaction_id: "prefix-test-txn-id",
+					latest_timestamp: "1970-01-01T00:00:00.000Z",
+				},
+				steps: [],
+				transaction_history: [],
+				validationLib: "",
+				helperLib: "",
+			};
+			const base = new MockRunner(baseConfig, true);
+			base.getConfig().steps.push(base.getDefaultStep("search", "search_0"));
+			prefixedRunner = new MockRunner(
+				await createOptimizedMockConfig(base.getConfig()),
+				true,
+			);
+		});
+
+		it("runGeneratePayload: GENERATED#1#search_0 resolves to search_0", async () => {
+			const result = await prefixedRunner.runGeneratePayload(
+				"GENERATED#1#search_0",
+				{},
+			);
+			expect(result.success).toBe(true);
+		});
+
+		it("runGeneratePayload: plain search_0 still works", async () => {
+			const result = await prefixedRunner.runGeneratePayload("search_0", {});
+			expect(result.success).toBe(true);
+		});
+
+		it("runGeneratePayloadWithSession: GENERATED#1#search_0 resolves to search_0", async () => {
+			const result = await prefixedRunner.runGeneratePayloadWithSession(
+				"GENERATED#1#search_0",
+				{ transaction_id: "some-txn" },
+			);
+			expect(result.success).toBe(true);
+		});
+
+		it("runValidatePayload: GENERATED#1#search_0 resolves to search_0", async () => {
+			const payload = {
+				context: { domain: "ONDC:TRV14", action: "search" },
+				message: {},
+			};
+			const result = await prefixedRunner.runValidatePayload(
+				"GENERATED#1#search_0",
+				payload,
+			);
+			expect(result.success).toBe(true);
+		});
+
+		it("runValidatePayloadWithSession: GENERATED#1#search_0 resolves to search_0", async () => {
+			const result = await prefixedRunner.runValidatePayloadWithSession(
+				"GENERATED#1#search_0",
+				{ context: {}, message: {} },
+				{},
+			);
+			expect(result.success).toBe(true);
+		});
+
+		it("runMeetRequirements: GENERATED#1#search_0 resolves to search_0", async () => {
+			const result = await prefixedRunner.runMeetRequirements(
+				"GENERATED#1#search_0",
+			);
+			expect(result.success).toBe(true);
+		});
+
+		it("runMeetRequirementsWithSession: GENERATED#1#search_0 resolves to search_0", async () => {
+			const result = await prefixedRunner.runMeetRequirementsWithSession(
+				"GENERATED#1#search_0",
+				{},
+			);
+			expect(result.success).toBe(true);
+		});
+
+		it("unknown prefixed action ID returns failure", async () => {
+			const result = await prefixedRunner.runGeneratePayload(
+				"GENERATED#1#unknown_action",
+				{},
+			);
+			expect(result.success).toBe(false);
+			expect(result.error?.message).toContain("unknown_action");
+		});
+
+		it("deeply prefixed ID (multiple #) uses only the last segment", async () => {
+			const result = await prefixedRunner.runGeneratePayload(
+				"PREFIX#ANOTHER#search_0",
+				{},
+			);
+			expect(result.success).toBe(true);
+		});
+	});
 });
