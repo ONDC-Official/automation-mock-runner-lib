@@ -33,6 +33,20 @@ const DEFAULT_POOL_SIZE = 2;
 const MAX_EXECUTIONS_PER_WORKER = 100;
 const MAX_WORKER_AGE_MS = 10 * 60 * 1000; // 10 minutes
 
+export interface NodeRunnerOptions {
+	maxMemoryMB?: number;
+	poolSize?: number;
+	maxExecutionsPerWorker?: number;
+	maxWorkerAgeMs?: number;
+	/**
+	 * Base URLs that `generate` functions may fetch. Each entry is parsed with
+	 * `new URL(entry)`; a request is allowed iff its origin matches the entry's
+	 * origin AND its pathname is a strict segment-prefix of the entry's pathname.
+	 * Absent / empty → fetch is not injected (blocked).
+	 */
+	allowedFetchBaseUrls?: string[];
+}
+
 export class NodeRunner implements BaseCodeRunner {
 	private pool: PooledWorker[] = [];
 	private waitQueue: Array<(pw: PooledWorker) => void> = [];
@@ -43,21 +57,16 @@ export class NodeRunner implements BaseCodeRunner {
 	private readonly poolSize: number;
 	private readonly maxExecutionsPerWorker: number;
 	private readonly maxWorkerAgeMs: number;
+	private readonly allowedFetchBaseUrls: string[];
 
-	constructor(
-		options: {
-			maxMemoryMB?: number;
-			poolSize?: number;
-			maxExecutionsPerWorker?: number;
-			maxWorkerAgeMs?: number;
-		} = {},
-	) {
+	constructor(options: NodeRunnerOptions = {}) {
 		this.workerPath = path.join(__dirname, "../../../public/node-worker.js");
 		this.maxMemoryMB = options.maxMemoryMB || 128;
 		this.poolSize = options.poolSize || DEFAULT_POOL_SIZE;
 		this.maxExecutionsPerWorker =
 			options.maxExecutionsPerWorker || MAX_EXECUTIONS_PER_WORKER;
 		this.maxWorkerAgeMs = options.maxWorkerAgeMs || MAX_WORKER_AGE_MS;
+		this.allowedFetchBaseUrls = options.allowedFetchBaseUrls ?? [];
 
 		// Pre-warm the pool
 		for (let i = 0; i < this.poolSize; i++) {
@@ -75,6 +84,9 @@ export class NodeRunner implements BaseCodeRunner {
 				codeRangeSizeMb: 16,
 			},
 			env: {},
+			workerData: {
+				allowedFetchBaseUrls: this.allowedFetchBaseUrls,
+			},
 		});
 
 		const pw: PooledWorker = {

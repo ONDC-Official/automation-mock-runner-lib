@@ -14,7 +14,9 @@ export class CodeValidator {
 		"SharedWorker",
 		"WebSocket",
 		"XMLHttpRequest",
-		"fetch",
+		// `fetch` is allowed past static analysis and gated at runtime in the
+		// worker sandbox: injected only for `generate` and only when the
+		// configured allowlist matches origin + path prefix.
 	];
 
 	private static FORBIDDEN_PROPERTIES = [

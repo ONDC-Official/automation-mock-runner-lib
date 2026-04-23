@@ -1,5 +1,5 @@
 import { BaseCodeRunner } from "./runners/base-runner";
-import { RunnerFactory } from "./runners/runner-factory";
+import { RunnerFactory, RunnerOptions } from "./runners/runner-factory";
 import { MockPlaygroundConfigType } from "./types/mock-config";
 import { validateConfigWithErrors } from "./utils/validateConfig";
 import { Logger } from "./utils/logger";
@@ -25,6 +25,31 @@ export class MockRunner {
 		if (!MockRunner.sharedRunner) {
 			MockRunner.sharedRunner = RunnerFactory.createRunner({}, logger);
 		}
+		return MockRunner.sharedRunner;
+	}
+
+	/**
+	 * Initialize (or replace) the process-wide shared runner with explicit
+	 * options. Call this once at service boot — before constructing any
+	 * MockRunner — to configure the fetch allowlist and worker pool settings.
+	 *
+	 * If a shared runner already exists it is terminated and replaced.
+	 */
+	public static initSharedRunner(options: RunnerOptions = {}): BaseCodeRunner {
+		const logger = Logger.getInstance();
+		if (MockRunner.sharedRunner) {
+			logger.warn("Replacing existing shared runner");
+			try {
+				MockRunner.sharedRunner.terminate();
+			} catch (e) {
+				logger.error(
+					"Failed to terminate previous shared runner",
+					{},
+					e as Error,
+				);
+			}
+		}
+		MockRunner.sharedRunner = RunnerFactory.createRunner(options, logger);
 		return MockRunner.sharedRunner;
 	}
 
@@ -83,6 +108,7 @@ export class MockRunner {
 	public async runGeneratePayload(
 		actionId: string,
 		inputs: any = {},
+		extraSessionData?: Record<string, any>,
 	): Promise<ExecutionResult> {
 		const executionId = this.logger.createExecutionContext(actionId);
 		const startTime = Date.now();
@@ -109,6 +135,10 @@ export class MockRunner {
 				JSON.stringify(step.mock.defaultPayload),
 			);
 			const sessionData = await this.getSessionDataUpToStep(index);
+
+			if (extraSessionData) {
+				Object.assign(sessionData, extraSessionData);
+			}
 
 			// Validate inputs against schema if provided
 			if (step.mock.inputs?.jsonSchema && Object.keys(inputs).length > 0) {
@@ -282,6 +312,7 @@ export class MockRunner {
 	public async runValidatePayload(
 		actionId: string,
 		targetPayload: any,
+		extraSessionData?: Record<string, any>,
 	): Promise<ExecutionResult> {
 		try {
 			const baseActionId = MockRunner.resolveBaseActionId(actionId);
@@ -294,6 +325,10 @@ export class MockRunner {
 			);
 			const schema = getFunctionSchema("validate");
 			const sessionData = await this.getSessionDataUpToStep(index);
+
+			if (extraSessionData) {
+				Object.assign(sessionData, extraSessionData);
+			}
 
 			const result = await this.getRunnerInstance().execute(
 				MockRunner.decodeBase64(step.mock.validate),

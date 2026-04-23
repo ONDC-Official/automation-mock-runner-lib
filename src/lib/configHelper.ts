@@ -4,6 +4,8 @@ import { v4 as uuidv4 } from "uuid";
 import { minify } from "terser";
 import { Flow } from "./types/flow-types";
 import { validateGoodConfig } from "./utils/validateConfig";
+import { DEFAULT_HELPER_LIB } from "./helpers";
+
 export function createInitialMockConfig(
 	domain: string,
 	version: string,
@@ -29,66 +31,9 @@ export function createInitialMockConfig(
 		steps: [],
 		transaction_history: [],
 		validationLib: "",
-		helperLib: MockRunner.encodeBase64(defaultHelpers),
+		helperLib: MockRunner.encodeBase64(DEFAULT_HELPER_LIB),
 	};
 }
-
-const defaultHelpers = `/*
-	Custom helper functions available in all mock generation functions.
-	these are appended below the generate function for each step.
-*/
-
-const createFormURL = (domain,formId, sessionData) => {
-	const baseURL = sessionData.mockBaseUrl;
-	const transactionId = sessionData.transactionId[0];
-	const sessionId = sessionData.sessionId;
-	return \`\${baseURL}/forms/\${domain}/\${formId}/?transaction_id=\${transactionId}&session_id=\${sessionId}\`;
-}
-
-// Generates a UUID v4
-function uuidv4() {
-	return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-	  const r = Math.random() * 16 | 0;
-	  const v = c === 'x' ? r : (r & 0x3 | 0x8);
-	  return v.toString(16);
-	});
-}
-
-// Generate a 6 digit string ID
-function generate6DigitId() {
-	return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
-// Returns the current ISO timestamp
-function currentTimestamp() {
-	return new Date().toISOString();
-}
-
-// Converts ISO 8601 duration string to total seconds
-const isoDurToSec = (duration) => {
-  const durRE = /P((\d+)Y)?((\d+)M)?((\d+)W)?((\d+)D)?T?((\d+)H)?((\d+)M)?((\d+)S)?/;
-  const s = durRE.exec(duration);
-  if (!s) return 0;
-  
-  return (Number(s?.[2]) || 0) * 31536000 +
-	(Number(s?.[4]) || 0) * 2628288 +
-	(Number(s?.[6]) || 0) * 604800 +
-	(Number(s?.[8]) || 0) * 86400 +
-	(Number(s?.[10]) || 0) * 3600 +
-	(Number(s?.[12]) || 0) * 60 +
-	(Number(s?.[14]) || 0);
-};
-
-const setCityFromInputs = (payload, inputs) => {
-	if (!inputs) return "*";
-	let version = payload.context.version || payload.context.core_version || "2.0.0";
-	if (version.startsWith("1")) {
-		payload.context.city = inputs.city_code ?? "*";
-	} else {
-		payload.context.location.city.code = inputs.city_code ?? "*";
-	}
-}
-`;
 
 export function convertToFlowConfig(config: MockPlaygroundConfigType) {
 	const flowConfig: any = {};
@@ -179,13 +124,24 @@ export function convertToFlowConfig(config: MockPlaygroundConfigType) {
 			step.mock.inputs !== null &&
 			Object.keys(step.mock.inputs).length > 0
 		) {
-			flowStep.input = [
-				{
-					name: step.mock.inputs.id,
-					type: step.mock.inputs.id,
-					schema: step.mock.inputs.jsonSchema,
-				},
-			];
+			if (step.mock.inputs.id == "finvu_verification") {
+				flowStep.input = [
+					{
+						name: "finvu_verification",
+						label: "Complete Account Aggregator Verification",
+						type: "FINVU_REDIRECT",
+						payloadField: "$.context.aa_consent_verified",
+					},
+				];
+			} else {
+				flowStep.input = [
+					{
+						name: step.mock.inputs.id,
+						type: step.mock.inputs.id,
+						schema: step.mock.inputs.jsonSchema,
+					},
+				];
+			}
 		}
 
 		if (step.mock.inputs?.oldInputs) {
@@ -202,6 +158,7 @@ export function convertToFlowConfig(config: MockPlaygroundConfigType) {
 	}
 	return flowConfig;
 }
+
 export async function createOptimizedMockConfig(
 	config: MockPlaygroundConfigType,
 ): Promise<MockPlaygroundConfigType> {

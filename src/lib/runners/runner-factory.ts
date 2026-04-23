@@ -1,6 +1,8 @@
 import { Worker } from "worker_threads";
 import { BrowserRunner } from "./browser-runner";
-import { NodeRunner } from "./node-runner";
+import { NodeRunner, NodeRunnerOptions } from "./node-runner";
+
+export type RunnerOptions = NodeRunnerOptions;
 
 /**
  * Factory for creating workers in both browser and Node.js environments
@@ -105,7 +107,10 @@ export class RunnerFactory {
 	/**
 	 * Creates appropriate runner based on environment
 	 */
-	static createRunner(options?: any, logger?: any): BrowserRunner | NodeRunner {
+	static createRunner(
+		options?: RunnerOptions,
+		logger?: any,
+	): BrowserRunner | NodeRunner {
 		const env = RunnerFactory.getEnvironment();
 		logger?.debug(`Creating runner for environment: ${env}`);
 		if (env === "browser") {
