@@ -27,6 +27,10 @@ export function createInitialMockConfig(
 			bap_uri: "https://bap.example.com",
 			bpp_id: "bpp.example.com",
 			bpp_uri: "https://bpp.example.com",
+			external_session_data: {
+				finvuUrl: "https://dev-automation.ondc.org/finvu",
+				mockBaseUrl: "https://dev-automation.ondc.org/mock",
+			},
 		},
 		steps: [],
 		transaction_history: [],

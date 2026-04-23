@@ -20,6 +20,7 @@ export const TransactionDataSchema = z.object({
 	bap_uri: z.string().min(1, "BAP URI is required").optional(),
 	bpp_id: z.string().min(1, "BPP ID is required").optional(),
 	bpp_uri: z.string().min(1, "BPP URI is required").optional(),
+	external_session_data: z.record(z.string(), z.any()).optional(),
 });
 
 export const MockConfigSchema = z.object({
