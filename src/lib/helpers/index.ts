@@ -1,13 +1,9 @@
-import * as defaultHelperFns from "./default-helpers";
+import { DEFAULT_HELPERS_RAW } from "./default-helpers-source";
 
 const HEADER = `/*
 	Custom helper functions available in all mock generate() functions.
-	Assembled from src/lib/helpers/default-helpers.js — edit there.
+	Source: src/lib/helpers/default-helpers.js — edit there, then run
+	\`npm run helpers:gen\` to refresh.
 */`;
 
-export const DEFAULT_HELPER_LIB: string = [
-	HEADER,
-	...Object.values(defaultHelperFns)
-		.filter((v): v is (...args: any[]) => any => typeof v === "function")
-		.map((f) => f.toString()),
-].join("\n\n");
+export const DEFAULT_HELPER_LIB: string = HEADER + "\n\n" + DEFAULT_HELPERS_RAW;

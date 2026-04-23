@@ -273,7 +273,9 @@ describe("DEFAULT_HELPER_LIB bundle", () => {
 	}
 
 	it("does not leak `module.exports` or `require` into the bundle source", () => {
-		expect(DEFAULT_HELPER_LIB).not.toMatch(/module\.exports/);
+		// Statement-level `module.exports = ...` (line-anchored) would throw
+		// ReferenceError in the sandbox. Mentions inside comments are harmless.
+		expect(DEFAULT_HELPER_LIB).not.toMatch(/^module\.exports\s*=/m);
 		expect(DEFAULT_HELPER_LIB).not.toMatch(/\brequire\s*\(/);
 	});
 
@@ -306,8 +308,15 @@ describe("DEFAULT_HELPER_LIB bundle", () => {
 	it("preserves in-body docs so playground users see them", () => {
 		// Guard against a future refactor silently dropping the in-body comments
 		// the way the pre-refactor .toString() pattern did.
-		expect(DEFAULT_HELPER_LIB).toContain("Generates a UUID v4");
+		expect(DEFAULT_HELPER_LIB).toContain("Generate a UUID v4");
 		expect(DEFAULT_HELPER_LIB).toContain("ISO 8601 duration");
 		expect(DEFAULT_HELPER_LIB).toContain("Finvu AA Service");
+	});
+
+	it("preserves source fidelity (no bundler lowering / numeric packing)", () => {
+		// If a future build step reintroduces fn.toString() or otherwise lets a
+		// minifier touch the helper bodies, these canaries break.
+		expect(DEFAULT_HELPER_LIB).toContain("s?.[2]");
+		expect(DEFAULT_HELPER_LIB).toContain("100000 + Math.random() * 900000");
 	});
 });
