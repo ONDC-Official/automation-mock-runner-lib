@@ -1,48 +1,23 @@
 # @ondc/automation-mock-runner
 
-A robust TypeScript library designed for testing and validating ONDC (Open Network for Digital Commerce) transaction flows. This tool helps developers build reliable ONDC integrations by providing a comprehensive framework for generating, validating, and testing API payloads across different transaction scenarios.
+A TypeScript library for driving ONDC (Open Network for Digital Commerce) transaction flows end-to-end. It turns a **base64-encoded, sandboxed function config** into an executable multi-step flow, handling payload generation, response validation, session state, and (optionally) outbound HTTP — in either Node (worker_threads) or the browser (Web Workers).
 
-## What is this?
+## What it does
 
-When building applications that integrate with the ONDC network, you need to handle complex multi-step transaction flows where each API call depends on data from previous steps. This library provides a structured way to:
-
-- **Generate realistic test payloads** for ONDC APIs (search, select, init, confirm, etc.)
-- **Validate incoming requests** against your business logic with custom validation functions
-- **Check prerequisites** before proceeding with each transaction step
-- **Maintain session state** across the entire transaction flow
-- **Execute code securely** using sandboxed Worker Threads with base64-encoded functions
-
-The core concept is simple: define your transaction flow with base64-encoded functions, then let the runner handle payload generation, validation, and state management automatically in a secure environment.
+- **Generate payloads** for every step of a flow, with `context` (domain, version, ids, timestamps, bap/bpp) produced automatically.
+- **Validate responses** against custom per-step logic.
+- **Check prerequisites** before a step runs.
+- **Carry session state** across steps via JSONPath extraction of prior payloads.
+- **Sandbox every function** so user-authored JS runs with a whitelisted set of globals and per-function timeouts, and cannot touch the host filesystem, network, or module system — except where the installing service has explicitly allowlisted outbound URLs for `generate`.
 
 ## Key Features
 
-### 🔄 Transaction Flow Management
-
-- Define multi-step ONDC transaction flows with dependencies between steps
-- Automatic context generation with proper ONDC headers and metadata
-- Session data persistence across transaction steps
-
-### 🔒 Secure Code Execution
-
-- **Base64-encoded functions** for secure storage and transmission
-- **Sandboxed Worker Threads** with isolated VM contexts
-- **Complete function declarations** required (not just function bodies)
-- Built-in timeout protection and error isolation
-- Memory limits and resource monitoring
-
-### ✅ Schema Validation
-
-- Zod-based configuration validation with base64 string validation
-- Runtime type checking for all inputs and outputs
-- Detailed error reporting with line-by-line feedback
-- JSON Schema validation for user inputs
-
-### 🎯 ONDC-Specific Features
-
-- Built-in support for BAP (Buyer App) and BPP (Seller App) roles
-- Automatic message ID correlation for request-response pairs
-- Version-aware context generation (supports ONDC v1.x and v2.x)
-- Domain-specific helper utilities
+- 🔄 Multi-step flow management with automatic `context` building and request/response correlation via `responseFor`.
+- 🔒 Worker-thread (Node) / Web Worker (browser) sandbox. Whitelisted globals, per-function timeouts, workers recycled after 100 executions or 10 min.
+- 🌐 Opt-in outbound `fetch` from `generate` with a per-installer origin+path allowlist. Redirects blocked (`redirect: "error"`).
+- 📚 Built-in **default helper library** (`uuidv4`, `currentTimestamp`, `isoDurToSec`, `setCityFromInputs`, `createFormURL`, `generate6DigitId`, `getSubscriberUrl`, `generateConsentHandler`) prepended to every `generate`.
+- ✅ Zod-based config validation, JSON Schema for user inputs.
+- 🎯 ONDC-aware: version-aware context (v1.x flat `city`, v2.x nested `location.city.code`), BAP/BPP roles, form steps (`dynamic_form`, `html_form`, `HTML_FORM_MULTI`), dynamic action IDs (`GENERATED#n#action_id`).
 
 ## Installation
 
@@ -50,125 +25,89 @@ The core concept is simple: define your transaction flow with base64-encoded fun
 npm install @ondc/automation-mock-runner
 ```
 
+**Requires Node ≥ 18** (the sandbox uses native `fetch` and `AbortController`).
+
 ## Quick Start
 
-Here's how to set up a basic ONDC search flow with base64-encoded functions:
-
 ```typescript
-import { MockRunner } from "@ondc/automation-mock-runner";
-import { MockPlaygroundConfigType } from "@ondc/automation-mock-runner";
+import {
+	MockRunner,
+	createInitialMockConfig,
+} from "@ondc/automation-mock-runner";
 
-// Helper function to encode functions as base64
-function encodeFunction(functionCode: string): string {
-	return MockRunner.encodeBase64(functionCode);
-}
+// 1. Boot the shared runner once at service startup.
+//    Only needed if any `generate` function calls fetch().
+MockRunner.initSharedRunner({
+	allowedFetchBaseUrls: ["https://dev-automation.ondc.org/finvu"],
+});
 
-// Define your transaction configuration
-const config: MockPlaygroundConfigType = {
-	meta: {
-		domain: "ONDC:RET11",
-		version: "1.2.0",
-		flowId: "search-select-init-confirm",
-	},
-	transaction_data: {
-		transaction_id: "550e8400-e29b-41d4-a716-446655440000",
-		latest_timestamp: new Date().toISOString(),
-		bap_id: "buyer-app.example.com",
-		bap_uri: "https://buyer-app.example.com",
-		bpp_id: "seller-app.example.com",
-		bpp_uri: "https://seller-app.example.com",
-	},
-	steps: [
-		{
-			api: "search",
-			action_id: "search_001",
-			owner: "BAP",
-			responseFor: null,
-			unsolicited: false,
-			description: "Search for products in electronics category",
-			mock: {
-				generate: encodeFunction(`
-          async function generate(defaultPayload, sessionData) {
-            // Add search intent to the payload
-            defaultPayload.message = {
-              intent: {
-                category: { descriptor: { name: "Electronics" } },
-                location: { country: { code: "IND" }, city: { code: "std:080" } }
-              }
-            };
-            return defaultPayload;
-          }
-        `),
-				validate: encodeFunction(`
-          function validate(targetPayload, sessionData) {
-            if (!targetPayload.message?.catalog?.providers?.length) {
-              return { valid: false, code: 400, description: "No providers found" };
-            }
-            return { valid: true, code: 200, description: "Valid catalog response" };
-          }
-        `),
-				requirements: encodeFunction(`
-          function meetsRequirements(sessionData) {
-            return { valid: true, code: 200, description: "Ready to search" };
-          }
-        `),
-				defaultPayload: { context: {}, message: {} },
-				saveData: {
-					providers: "$.message.catalog.providers",
-				},
-				inputs: {
-					id: "search_inputs",
-					jsonSchema: {
-						type: "object",
-						properties: {
-							category: { type: "string", default: "Electronics" },
-						},
+// 2. Scaffold a config (auto-fills `helperLib` with DEFAULT_HELPER_LIB).
+const config = createInitialMockConfig("ONDC:RET11", "2.0.0", "search-flow");
+
+// 3. Add a step. Every helper (uuidv4, currentTimestamp, setCityFromInputs, …)
+//    is already in scope inside `generate`.
+config.steps.push({
+	api: "search",
+	action_id: "search_0",
+	owner: "BAP",
+	responseFor: null,
+	unsolicited: false,
+	description: "Search for electronics",
+	mock: {
+		generate: MockRunner.encodeBase64(`
+			async function generate(defaultPayload, sessionData) {
+				setCityFromInputs(defaultPayload, sessionData.user_inputs);
+				defaultPayload.message = {
+					intent: {
+						category: { descriptor: { name: "Electronics" } },
 					},
-				},
+				};
+				return defaultPayload;
+			}
+		`),
+		validate: MockRunner.encodeBase64(`
+			function validate(targetPayload, sessionData) {
+				if (!targetPayload.message?.catalog?.providers?.length) {
+					return { valid: false, code: 400, description: "No providers" };
+				}
+				return { valid: true, code: 200, description: "ok" };
+			}
+		`),
+		requirements: MockRunner.encodeBase64(`
+			function meetsRequirements(sessionData) {
+				return { valid: true, code: 200, description: "ready" };
+			}
+		`),
+		defaultPayload: { context: {}, message: {} },
+		saveData: { providers: "$.message.catalog.providers" },
+		inputs: {
+			id: "search_inputs",
+			jsonSchema: {
+				type: "object",
+				properties: { city_code: { type: "string" } },
+				required: ["city_code"],
 			},
 		},
-	],
-	transaction_history: [],
-	validationLib: encodeFunction(`
-    // Shared validation utilities
-    function validateONDCContext(context) {
-      return context && context.domain && context.action && context.message_id;
-    }
-  `),
-	helperLib: encodeFunction(`
-    // Shared helper functions
-    function generateMessageId() {
-      return crypto.randomUUID();
-    }
-  `),
-};
-
-// Initialize the runner
-const runner = new MockRunner(config);
-
-// Generate a search payload
-const searchResult = await runner.runGeneratePayload("search_001", {
-	category: "Electronics",
+	},
 });
-console.log("Generated search payload:", searchResult.result);
 
-// Validate a response
-const validationResult = await runner.runValidatePayload(
-	"search_001",
-	responsePayload,
-);
-console.log("Validation passed:", validationResult.success);
+// 4. Run.
+const runner = new MockRunner(config);
+const out = await runner.runGeneratePayload("search_0", {
+	city_code: "std:080",
+});
+console.log(out.result);
 ```
 
 ## Configuration Structure
 
-### Transaction Metadata
+### Meta
 
 ```typescript
 meta: {
-  domain: string,     // ONDC domain (retail, mobility, etc.)
-  version: string,    // ONDC version (1.2.0, 2.0.0, etc.)
-  flowId: string      // Unique identifier for this flow
+	domain: string; // e.g. "ONDC:RET11"
+	version: string; // e.g. "1.2.0" or "2.0.0" — drives context shape
+	flowId: string;
 }
 ```
 
@@ -176,360 +115,296 @@ meta: {
 
 ```typescript
 transaction_data: {
-  transaction_id: string,      // UUID for this transaction
-  latest_timestamp: string,    // ISO timestamp
-  bap_id?: string,            // Buyer app ID
-  bap_uri?: string,           // Buyer app URI
-  bpp_id?: string,            // Seller app ID
-  bpp_uri?: string            // Seller app URI
+	transaction_id: string;
+	latest_timestamp: string;
+	bap_id?: string;
+	bap_uri?: string;
+	bpp_id?: string;
+	bpp_uri?: string;
 }
 ```
 
-### Action Steps
-
-Each step represents one API call in your transaction flow:
+### Action Step
 
 ```typescript
 {
-  api: "search" | "select" | "init" | "confirm" | "on_search" | "on_select" | ...,
-  action_id: string,          // Unique ID for this step
-  owner: "BAP" | "BPP",      // Who initiates this call
-  responseFor: string | null, // If this responds to another action
-  unsolicited: boolean,       // Whether this is an unsolicited call
-  description: string,        // Human-readable description
-  mock: {
-    generate: string,         // Base64-encoded complete function for payload generation
-    validate: string,         // Base64-encoded complete function for response validation
-    requirements: string,     // Base64-encoded complete function for prerequisite checks
-    defaultPayload: object,   // Base payload structure
-    saveData: object,         // JSONPath expressions to save data
-    inputs: object           // Input schema for user data
-  }
-}
-```
-
-## 🔑 Base64 Function Requirements
-
-**IMPORTANT**: All mock functions must be:
-
-1. **Complete function declarations** with proper function names:
-   - `generate` functions: `async function generate(defaultPayload, sessionData) { ... }`
-   - `validate` functions: `function validate(targetPayload, sessionData) { ... }`
-   - `requirements` functions: `function meetsRequirements(sessionData) { ... }`
-
-2. **Base64 encoded** using `MockRunner.encodeBase64()` utility
-
-3. **Properly formatted** with return statements and error handling
-
-### Function Signatures
-
-Each function type has a specific signature that must be followed:
-
-#### Generate Functions
-
-```typescript
-async function generate(defaultPayload: any, sessionData: any): Promise<any> {
-	// Parameters:
-	// - defaultPayload: Base payload with context already populated
-	// - sessionData: Contains user_inputs and data from previous steps
-
-	// Must return the complete payload to be sent
-	return defaultPayload;
-}
-```
-
-#### Validate Functions
-
-```typescript
-function validate(targetPayload: any, sessionData: any): ValidationResult {
-	// Parameters:
-	// - targetPayload: The incoming payload to validate
-	// - sessionData: Data from previous steps
-
-	// Must return validation result object
-	return {
-		valid: true,
-		code: 200,
-		description: "Validation passed",
-	};
-}
-```
-
-#### Requirements Functions
-
-```typescript
-function meetsRequirements(sessionData: any): RequirementResult {
-	// Parameters:
-	// - sessionData: Data from previous steps
-
-	// Must return requirement check result
-	return {
-		valid: true,
-		code: 200,
-		description: "Requirements met",
-	};
-}
-```
-
-### Example Function Creation:
-
-```typescript
-// Create a complete function
-const generateFunction = `
-  async function generate(defaultPayload, sessionData) {
-    // Your logic here
-    defaultPayload.message = { 
-      intent: { category: { descriptor: { name: "Electronics" } } }
-    };
-    return defaultPayload;
-  }
-`;
-
-// Encode it as base64
-const encodedFunction = MockRunner.encodeBase64(generateFunction);
-
-// Use in configuration
-const step = {
-	// ...other properties...
+	api: "search" | "select" | "init" | "confirm"
+		| "on_search" | "on_select" | /* … */
+		| "dynamic_form" | "html_form" | "HTML_FORM_MULTI",
+	action_id: string,          // unique within flow
+	owner: "BAP" | "BPP",
+	responseFor: string | null, // pair this step with a request action_id
+	unsolicited: boolean,
+	description: string,
+	repeatCount?: number,
+	force_proceed?: boolean,    // skip the "waiting for input" gate; see Form Steps
 	mock: {
-		generate: encodedFunction,
-		// ...other mock properties...
+		generate: string,        // base64 function
+		validate: string,        // base64 function
+		requirements: string,    // base64 function
+		defaultPayload: object,
+		saveData: Record<string, string>,  // JSONPath map; supports APPEND# / EVAL# prefixes
+		inputs: object | {},
+		formHtml?: string,       // base64 HTML for form steps
 	},
-};
+}
 ```
 
-## Advanced Usage
+## Base64 Function Requirements
 
-### Chaining Transaction Steps
+All three user functions must be **complete declarations**:
 
-```typescript
-const steps = [
-	{
-		api: "search",
-		action_id: "search_001",
-		// ... search configuration
-		mock: {
-			saveData: {
-				selectedProvider: "$.message.catalog.providers[0]",
-			},
-			// ...
-		},
-	},
-	{
-		api: "select",
-		action_id: "select_001",
-		// ... select configuration
-		mock: {
-			generate: `
-        // Use data from previous search step
-        const provider = sessionData.selectedProvider;
-        defaultPayload.message = {
-          order: {
-            provider: { id: provider.id },
-            items: [{ id: provider.items[0].id, quantity: { count: 1 } }]
-          }
-        };
-        return defaultPayload;
-      `,
-			// ...
-		},
-	},
-];
+```js
+async function generate(defaultPayload, sessionData) {
+	/* … */ return defaultPayload;
+}
+function validate(targetPayload, sessionData) {
+	/* … */ return { valid, code, description };
+}
+function meetsRequirements(sessionData) {
+	/* … */ return { valid, code, description };
+}
 ```
 
-### Custom Validation Logic
-
-```typescript
-// Create complete validation function
-const validateFunction = `
-  function validate(targetPayload, sessionData) {
-    // Check if order total matches expected amount
-    const expectedTotal = sessionData.calculatedTotal;
-    const actualTotal = targetPayload.message.order.quote.total;
-    
-    if (Math.abs(expectedTotal - actualTotal) > 0.01) {
-      return {
-        valid: false,
-        code: 400, 
-        description: \`Total mismatch: expected \${expectedTotal}, got \${actualTotal}\`
-      };
-    }
-    
-    return { valid: true, code: 200, description: "Order total validated" };
-  }
-`;
-
-// Encode for use in configuration
-const encodedValidateFunction = MockRunner.encodeBase64(validateFunction);
-```
-
-### User Input Handling
-
-```typescript
-// Create function that uses user inputs
-const generateWithInputs = `
-  async function generate(defaultPayload, sessionData) {
-    // Access user inputs
-    const { email, deliveryAddress } = sessionData.user_inputs;
-    
-    defaultPayload.message.order.billing = {
-      email: email,
-      address: deliveryAddress
-    };
-    
-    return defaultPayload;
-  }
-`;
-
-const stepWithInputs = {
-	// ... other config
-	mock: {
-		generate: MockRunner.encodeBase64(generateWithInputs),
-		inputs: {
-			id: "user_details",
-			jsonSchema: {
-				type: "object",
-				properties: {
-					email: { type: "string", format: "email" },
-					deliveryAddress: { type: "string", minLength: 10 },
-				},
-				required: ["email", "deliveryAddress"],
-			},
-		},
-	},
-};
-```
+Encode with `MockRunner.encodeBase64(src)`. The runner decodes, prepends `DEFAULT_HELPER_LIB` (for `generate`), and executes inside the sandbox.
 
 ## API Reference
 
-### MockRunner
+### `MockRunner.initSharedRunner(options?)`
 
-#### Constructor
-
-```typescript
-new MockRunner(config: MockPlaygroundConfigType)
-```
-
-#### Methods
-
-**`validateConfig()`**
-Validates the entire configuration against the schema.
+Static. Configure the process-wide shared runner at boot. Replaces any existing runner (terminates the old one). Call **once before** constructing any `MockRunner`.
 
 ```typescript
-const validation = runner.validateConfig();
-if (!validation.success) {
-	console.log("Config errors:", validation.errors);
-}
-```
-
-**`runGeneratePayload(actionId: string, inputs: any)`**
-Generates a payload for the specified action step.
-
-```typescript
-const result = await runner.runGeneratePayload("search_001", {
-	category: "books",
+MockRunner.initSharedRunner({
+	allowedFetchBaseUrls: [
+		"https://aa.example.com/finvu-aa",
+		"https://api.example.com/v1",
+	],
 });
 ```
 
-**`runValidatePayload(actionId: string, targetPayload: any)`**
-Validates an incoming payload against the specified action step.
+Empty / omitted `allowedFetchBaseUrls` means `fetch` is not injected into the sandbox at all.
+
+### `new MockRunner(config, skipValidation?)`
+
+Validates the config (Zod) on construction unless `skipValidation: true`.
+
+### `runGeneratePayload(actionId, inputs?, extraSessionData?)`
 
 ```typescript
-const result = await runner.runValidatePayload(
-	"on_search_001",
-	responsePayload,
+await runner.runGeneratePayload(
+	"search_0",
+	{ city_code: "std:080" }, // → sessionData.user_inputs
+	{ finvuUrl: "https://aa.example.com" }, // shallow-merged into sessionData
 );
 ```
 
-**`runMeetRequirements(actionId: string, targetPayload: any)`**
-Checks if prerequisites are met before proceeding with an action.
+### `runValidatePayload(actionId, targetPayload, extraSessionData?)`
 
 ```typescript
-const result = await runner.runMeetRequirements("select_001", {});
+await runner.runValidatePayload("on_search_0", incomingPayload, {
+	finvuUrl: "https://aa.example.com",
+});
 ```
 
-**`getDefaultStep(api: string, actionId: string)`**
-Creates a new step configuration with sensible defaults and base64-encoded template functions.
+### `runMeetRequirements(actionId)`
 
 ```typescript
-const newStep = runner.getDefaultStep("search", "search_002");
-// Returns a step with properly encoded template functions
+await runner.runMeetRequirements("select_0");
 ```
 
-**`MockRunner.encodeBase64(functionString: string)`**
-Static utility to encode functions as base64.
+### With-session variants
+
+Skip the history-based session build and use a caller-supplied object:
+
+- `runGeneratePayloadWithSession(actionId, sessionData)`
+- `runValidatePayloadWithSession(actionId, targetPayload, sessionData)`
+- `runMeetRequirementsWithSession(actionId, sessionData)`
+
+### `getDefaultStep(api, actionId, formType?)`
+
+Returns a scaffolded step with template functions already base64-encoded. Pass `formType: "dynamic_form" | "html_form"` for form scaffolds.
+
+### `validateConfig()`
+
+Re-validates the stored config; returns `{ success, errors? }`.
+
+### Static utilities
+
+- `MockRunner.encodeBase64(src)` / `decodeBase64(b64)` — work in both Node and browser (use `TextEncoder`/`TextDecoder`, not `Buffer`).
+
+## Default Helpers
+
+Every `generate` call is prefixed with `DEFAULT_HELPER_LIB` — these are always in scope:
+
+| Helper                                                 | Purpose                                                                         |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| `uuidv4()`                                             | RFC 4122 v4 UUID.                                                               |
+| `generate6DigitId()`                                   | 6-digit numeric string in `[100000, 999999]`.                                   |
+| `currentTimestamp()`                                   | ISO-8601 UTC timestamp.                                                         |
+| `isoDurToSec(duration)`                                | ISO 8601 duration → seconds (0 on unparseable input).                           |
+| `setCityFromInputs(payload, inputs)`                   | Writes `inputs.city_code` into `payload.context` (v1 flat / v2 nested).         |
+| `createFormURL(domain, formId, sessionData)`           | Build a `/forms/<domain>/<formId>/?...` submission URL from session data.       |
+| `getSubscriberUrl(sessionData, type)`                  | `"bpp"` → `sessionData.bppUri`; anything else → `bapUri`.                       |
+| `generateConsentHandler(sessionData, { custId, ... })` | POSTs to Finvu AA; 10s `AbortController` timeout. Needs `finvuUrl` + allowlist. |
+
+Source: `src/lib/helpers/default-helpers.js`. Edit that file and run `npm run helpers:gen` to refresh the shipped bundle (also regenerated automatically by `npm run build` and `npm test`).
+
+Helpers that need request-scope data (`getSubscriberUrl`, `createFormURL`, `generateConsentHandler`) take `sessionData` as an **explicit first parameter**. Free-variable references do not resolve inside the sandbox — helpers run at script scope, `sessionData` is only a parameter of `generate()`.
+
+## 3rd-party HTTP from `generate`
+
+Outbound HTTP is **opt-in and scoped**:
+
+1. Only `generate` gets `fetch` (validate / meetsRequirements / getSave stay pure).
+2. The installing service provides the allowlist at boot:
+   ```typescript
+   MockRunner.initSharedRunner({
+   	allowedFetchBaseUrls: ["https://finvu.example.com/aa"],
+   });
+   ```
+3. Matching rule: request `origin` must equal an entry's origin **and** the request path must be a strict segment-prefix of the entry's path. `/v1` matches `/v1` and `/v1/foo` but **not** `/v10/foo`.
+4. Redirects are blocked (`redirect: "error"`) — call final URLs, don't rely on 3xx hops.
+5. `AbortController` + `AbortSignal` are in the sandbox; use them for per-request timeouts.
+
+### Worked example — Finvu consent via `generateConsentHandler`
 
 ```typescript
-const encodedFunction = MockRunner.encodeBase64(`
-  async function generate(defaultPayload, sessionData) {
-    // Your function logic here
-    return defaultPayload;
-  }
-`);
+// boot
+MockRunner.initSharedRunner({
+	allowedFetchBaseUrls: ["https://dev-automation.ondc.org/finvu"],
+});
+
+// step's generate (base64-encoded)
+const src = `
+	async function generate(defaultPayload, sessionData) {
+		const handle = await generateConsentHandler(sessionData, { custId: "1234" });
+		defaultPayload.message.consentHandle = handle;
+		return defaultPayload;
+	}
+`;
+
+// caller passes finvuUrl through extraSessionData
+await runner.runGeneratePayload("consent_0", inputs, {
+	finvuUrl: "https://dev-automation.ondc.org/finvu",
+});
 ```
 
-**`MockRunner.decodeBase64(encodedString: string)`**
-Static utility to decode base64-encoded functions (used internally).
+## Sandbox globals & limits
+
+**Always available:** `Array, Boolean, Date, Error, JSON, Math, Number, Object, Promise, RegExp, String, Symbol, Map, Set, WeakMap, WeakSet, parseInt, parseFloat, isNaN, isFinite, encodeURI(Component), decodeURI(Component), setTimeout, clearTimeout, AbortController, AbortSignal, console.{log,error,warn,info}`.
+
+**Added for `generate` only** (and only when an allowlist is configured): `fetch, URL, URLSearchParams, Headers, Request, Response`.
+
+**Explicitly denied:** `require, process, global, globalThis, Buffer, __dirname, __filename, module, exports, eval, Function`.
+
+**Timeouts** (from `src/lib/constants/function-registry.ts`):
+
+| Function kind       | Timeout |
+| ------------------- | ------- |
+| `generate`          | 45 s    |
+| `validate`          | 5 s     |
+| `meetsRequirements` | 3 s     |
+| `getSave`           | 3 s     |
+
+`setTimeout` inside the sandbox is clamped to 1–45000 ms.
+
+## Dynamic action IDs
+
+Any `actionId` containing `#` is resolved by taking the last `#`-separated segment. So `"GENERATED#1#search_0"` and `"GENERATED#42#search_0"` both resolve to the step with `action_id: "search_0"`. Applies to all `run*` methods — useful when the same step repeats inside a flow.
+
+## Session data extraction
+
+Each step declares a `saveData` map of JSONPath expressions applied to the prior response payload. The compiled values land on `sessionData` for subsequent steps.
 
 ```typescript
-const decodedFunction = MockRunner.decodeBase64(encodedFunction);
-```
-
-## Error Handling
-
-The library provides detailed error information for debugging:
-
-```typescript
-const result = await runner.runGeneratePayload("invalid_step", {});
-
-if (!result.success) {
-	console.log("Error:", result.error.message);
-	console.log("Logs:", result.logs);
-	console.log("Execution time:", result.executionTime);
+saveData: {
+	providerId:          "$.message.catalog.providers[0].id",
+	"APPEND#providerIds": "$.message.catalog.providers[*].id",  // concat into array
+	customValue:         "EVAL#<base64 of extractor>",           // custom extractor
 }
 ```
 
-Common error types:
+- `APPEND#key` — concatenates the JSONPath result into an existing array under `key` instead of overwriting.
+- `EVAL#<base64>` — runs a sandboxed `getSave(payload)` function and stores its return value.
+- Form steps (`dynamic_form`, `html_form`) auto-save under `sessionData.formData[action_id]` and also set `sessionData[action_id]` to the submission ID.
 
-- **ValidationError**: Configuration or input validation failed
-- **PayloadGenerationError**: Error in payload generation code
-- **PayloadValidationError**: Error in validation code
-- **MeetRequirementsError**: Error in requirements check code
-- **TimeoutError**: Code execution exceeded timeout limit
+## Form steps
+
+Supported `api` values for forms: `dynamic_form`, `html_form`, `HTML_FORM_MULTI`, `FORM`.
+
+`force_proceed: true` on a step means "don't wait for user input". `convertToFlowConfig` sets this automatically when the previous step is a form step and the current step has no inputs.
+
+## Config builders
+
+From `@ondc/automation-mock-runner` (via `configHelper.ts`):
+
+- `createInitialMockConfig(domain, version, flowId)` — scaffold with `DEFAULT_HELPER_LIB` pre-installed as `helperLib`.
+- `generatePlaygroundConfigFromFlowConfig(payloads, flowConfig)` — reverse: seed a playground config from real ONDC traffic.
+- `generatePlaygroundConfigFromFlowConfigWithMeta(payloads, flowConfig, domain, version)` — same, with explicit meta (useful when payloads are empty).
+- `convertToFlowConfig(config)` — export a playground config to a Flow sequence.
+- `createOptimizedMockConfig(config)` — Terser-minify each step's `generate` / `validate` / `requirements`.
+- `validateConfigForDeployment(config)` — stricter pre-publish check (throws on problems).
+
+## Error handling
+
+Every `run*` method returns an `ExecutionResult`:
+
+```typescript
+const res = await runner.runGeneratePayload("search_0");
+if (!res.success) {
+	console.log(res.error.name, res.error.message);
+	console.log(res.logs); // captured console output
+	console.log(res.executionTime, "ms");
+}
+```
+
+Common error names: `ActionNotFoundError`, `SessionDataError`, `ConfigurationError`, `PayloadGenerationError`, `PayloadValidationError`, `MeetRequirementsError`.
+
+## FAQ / common gotchas
+
+**`DataCloneError: #<Promise> could not be cloned`** — your `generate` returned a payload containing an un-awaited Promise. Make `generate` `async` and `await` any async helper (including `generateConsentHandler`) before returning. Nested Promises inside the payload are not auto-flattened.
+
+**`fetch blocked: <url> is not in the configured allowlist`** — add the origin+path to `MockRunner.initSharedRunner({ allowedFetchBaseUrls: [...] })`.
+
+**`fetch is not defined`** — you're calling it from `validate`, `meetsRequirements`, or `getSave`. Only `generate` gets `fetch`.
+
+**Helper references `sessionData` but throws `ReferenceError`** — take `sessionData` as an explicit first parameter. Helpers don't share scope with `generate`.
+
+**Edited `default-helpers.js` but the bundle didn't change** — run `npm run helpers:gen` (or `npm test` / `npm run build` — both regen automatically).
+
+**`validationLib` is not injected** — the field exists in the schema but is not currently prepended to any function at execution time. Treat as reserved.
+
+**Execution timed out** — see the timeout table above. `generate` has the largest window (45 s) specifically for delayed-response mocking.
 
 ## Testing
 
-The library includes comprehensive tests. Run them with:
-
 ```bash
-npm test           # Run all tests
-npm run test:watch # Run tests in watch mode
-npm run test:coverage # Generate coverage report
+npm test              # full suite (regens helpers via pretest)
+npm run test:watch
+npm run test:coverage
+npm run test:browser-mock   # BrowserRunner / CrossEnvironment tests only
 ```
 
-## Security Considerations
+## Security notes
 
-- **Base64 encoding** prevents code injection through configuration
-- **Complete function declarations** required - no arbitrary code execution
-- **Sandboxed Worker Threads** with isolated VM contexts
-- **Restricted global access** - dangerous functions like `eval`, `require`, and file system access are blocked
-- **Execution timeouts** prevent infinite loops and hanging processes
-- **Memory limits** prevent resource exhaustion
-- **Input validation** using Zod schemas for all configuration data
+- Base64 encoding prevents casual injection via config files.
+- The sandbox blocks `eval`, `Function`, `require`, `process`, `Buffer`, filesystem, and (by default) network.
+- Network access is per-installer opt-in and path-scoped.
+- Redirects are refused to prevent allowlist bypass.
+- Workers are recycled after 100 executions / 10 min to limit memory creep in the V8 isolate.
 
 ## Contributing
 
-This library is built for the ONDC ecosystem. When contributing:
-
-1. Ensure all tests pass: `npm test`
-2. Follow the existing code style: `npm run lint`
-3. Add tests for new features
-4. Update documentation for API changes
+1. `npm test` — all tests green.
+2. `npm run lint` / `npm run format` — code style.
+3. `npm run type-check` — no TypeScript errors.
+4. Add tests for new features; update README when public API changes.
 
 ## License
 
-ISC License - see LICENSE file for details.
+ISC — see LICENSE.
 
 ## Support
 
-For ONDC-specific questions, refer to the [ONDC documentation](https://ondc.org/). For issues with this library, please file an issue on the repository.
+ONDC-specific questions: [ondc.org](https://ondc.org/). Library issues: file on the repository.

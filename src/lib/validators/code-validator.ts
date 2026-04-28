@@ -180,20 +180,41 @@ export class CodeValidator {
 	/**
 	 * Validate that return statements match expected structure
 	 */
+	/**
+	 * Collect ReturnStatement arguments belonging only to the outer (top-level)
+	 * function. Nested function/arrow bodies are skipped — their returns are
+	 * not the function's contract and would otherwise produce false positives.
+	 */
+	private static collectTopLevelReturns(ast: acorn.Node): any[] {
+		const returns: any[] = [];
+		let depth = 0;
+
+		const enterFn = (node: any, _st: any, c: any) => {
+			if (depth === 0) {
+				depth++;
+				c(node.body, null);
+				depth--;
+			}
+		};
+
+		walk.recursive(ast, null, {
+			FunctionDeclaration: enterFn,
+			FunctionExpression: enterFn,
+			ArrowFunctionExpression: enterFn,
+			ReturnStatement(node: any) {
+				if (node.argument) returns.push(node.argument);
+			},
+		});
+
+		return returns;
+	}
+
 	private static validateReturnStructure(
 		ast: acorn.Node,
 		expectedProperties: Record<string, { type: string; description: string }>
 	): string[] {
 		const warnings: string[] = [];
-		const foundReturns: any[] = [];
-
-		walk.simple(ast, {
-			ReturnStatement(node: any) {
-				if (node.argument) {
-					foundReturns.push(node.argument);
-				}
-			},
-		});
+		const foundReturns = this.collectTopLevelReturns(ast);
 
 		// Check if we have return statements
 		if (foundReturns.length === 0) {
@@ -354,13 +375,7 @@ export class CodeValidator {
 		schema: FunctionSchema
 	): string[] {
 		const warnings: string[] = [];
-		let hasReturn = false;
-
-		walk.simple(ast, {
-			ReturnStatement() {
-				hasReturn = true;
-			},
-		});
+		const hasReturn = this.collectTopLevelReturns(ast).length > 0;
 
 		if (!hasReturn) {
 			warnings.push(

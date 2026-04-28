@@ -86,5 +86,5 @@ Functions must be **base64**. Use `MockRunner.encodeBase64(src)` / `decodeBase64
 
 ## Unresolved questions
 
-- `validationLib` intentionally unused, or missing wiring? Worth asking before changing.
-- `flow-convertsion-test.ts` — real test needing rename, or dead scratch file?
+- `validationLib` intentionally unused, or missing wiring? Worth asking before changing. ignore for now
+- `flow-convertsion-test.ts` — real test needing rename, or dead scratch file? ignore for now
