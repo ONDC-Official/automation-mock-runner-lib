@@ -226,36 +226,64 @@ export class CodeValidator {
 			return warnings;
 		}
 
-		// Check the structure of returned objects
-		foundReturns.forEach((returnArg) => {
-			if (returnArg.type === "ObjectExpression") {
-				const returnedProps = new Set(
-					returnArg.properties.map((p: any) => p.key.name)
-				);
-				const expectedProps = Object.keys(expectedProperties);
-
-				// Check for missing properties
-				expectedProps.forEach((prop) => {
-					if (!returnedProps.has(prop)) {
-						warnings.push(
-							`Return object is missing property '${prop}' (expected: ${expectedProperties[prop].type})`
-						);
-					}
-				});
-
-				// Check for extra properties
-				returnedProps.forEach((prop) => {
-					if (!expectedProps.includes(prop as any)) {
-						warnings.push(`Return object has unexpected property '${prop}'`);
-					}
-				});
-			} else {
-				warnings.push(
-					`Function should return an object literal with properties: ${Object.keys(
-						expectedProperties
-					).join(", ")}`
-				);
+		// Flatten conditional/logical/sequence/parenthesized wrappers so that
+		// minifier output like `return cond ? {a:1} : {a:2}` or `return x && {...}`
+		// is treated as the set of object-literal branches it actually returns.
+		const objectBranches: any[] = [];
+		const stack: any[] = [...foundReturns];
+		let nonObjectFound = false;
+		while (stack.length) {
+			const node = stack.pop();
+			switch (node.type) {
+				case "ObjectExpression":
+					objectBranches.push(node);
+					break;
+				case "ConditionalExpression":
+					stack.push(node.consequent, node.alternate);
+					break;
+				case "LogicalExpression":
+					stack.push(node.left, node.right);
+					break;
+				case "SequenceExpression":
+					stack.push(node.expressions[node.expressions.length - 1]);
+					break;
+				case "ParenthesizedExpression":
+					stack.push(node.expression);
+					break;
+				default:
+					nonObjectFound = true;
 			}
+		}
+
+		if (objectBranches.length === 0 || nonObjectFound) {
+			warnings.push(
+				`Function should return an object literal with properties: ${Object.keys(
+					expectedProperties
+				).join(", ")}`
+			);
+		}
+
+		objectBranches.forEach((returnArg) => {
+			const returnedProps = new Set(
+				returnArg.properties.map((p: any) => p.key.name)
+			);
+			const expectedProps = Object.keys(expectedProperties);
+
+			// Check for missing properties
+			expectedProps.forEach((prop) => {
+				if (!returnedProps.has(prop)) {
+					warnings.push(
+						`Return object is missing property '${prop}' (expected: ${expectedProperties[prop].type})`
+					);
+				}
+			});
+
+			// Check for extra properties
+			returnedProps.forEach((prop) => {
+				if (!expectedProps.includes(prop as any)) {
+					warnings.push(`Return object has unexpected property '${prop}'`);
+				}
+			});
 		});
 
 		return warnings;

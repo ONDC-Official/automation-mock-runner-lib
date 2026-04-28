@@ -66,6 +66,13 @@ describe("CodeValidator.validate — return structure", () => {
 		).toBe(true);
 	});
 
+	it("accepts a minified conditional return: return i ? {...} : {...}", () => {
+		const code = `function validate(i,d){return i?{valid:!0,code:200,description:"Valid request"}:{valid:!1,code:200,description:"oh no"}}`;
+		const result = CodeValidator.validate(code, validateSchema);
+		expect(result.errors).toEqual([]);
+		expect(result.isValid).toBe(true);
+	});
+
 	it("warns when only a nested helper returns and the outer function has no return", () => {
 		const code = `
 			function validate(targetPayload, sessionData) {
