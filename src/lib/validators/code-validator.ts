@@ -141,7 +141,8 @@ export class CodeValidator {
 			if (schema.returnType.properties) {
 				const returnValidation = this.validateReturnStructure(
 					ast,
-					schema.returnType.properties
+					schema.returnType.properties,
+					schema.name
 				);
 				errors.push(...returnValidation);
 			}
@@ -181,26 +182,36 @@ export class CodeValidator {
 	 * Validate that return statements match expected structure
 	 */
 	/**
-	 * Collect ReturnStatement arguments belonging only to the outer (top-level)
-	 * function. Nested function/arrow bodies are skipped — their returns are
-	 * not the function's contract and would otherwise produce false positives.
+	 * Collect ReturnStatement arguments belonging only to the target function.
+	 * When `targetFnName` is given and a top-level `function <name>(...)` exists,
+	 * we walk only that body — sibling helpers like `function x(){return "hi"}`
+	 * declared next to `validate` are ignored. Returns inside nested
+	 * functions/arrows are also skipped (they aren't the contract).
+	 * Falls back to the whole AST when no named match is found.
 	 */
-	private static collectTopLevelReturns(ast: acorn.Node): any[] {
+	private static collectTopLevelReturns(
+		ast: acorn.Node,
+		targetFnName?: string
+	): any[] {
 		const returns: any[] = [];
-		let depth = 0;
+		const programBody: any[] = Array.isArray((ast as any).body)
+			? (ast as any).body
+			: [];
 
-		const enterFn = (node: any, _st: any, c: any) => {
-			if (depth === 0) {
-				depth++;
-				c(node.body, null);
-				depth--;
-			}
-		};
+		const targetFn = targetFnName
+			? programBody.find(
+					(n) =>
+						n.type === "FunctionDeclaration" && n.id?.name === targetFnName
+				)
+			: undefined;
 
-		walk.recursive(ast, null, {
-			FunctionDeclaration: enterFn,
-			FunctionExpression: enterFn,
-			ArrowFunctionExpression: enterFn,
+		const walkRoot: any = targetFn ? targetFn.body : ast;
+
+		const skip = () => {};
+		walk.recursive(walkRoot, null, {
+			FunctionDeclaration: skip,
+			FunctionExpression: skip,
+			ArrowFunctionExpression: skip,
 			ReturnStatement(node: any) {
 				if (node.argument) returns.push(node.argument);
 			},
@@ -211,10 +222,11 @@ export class CodeValidator {
 
 	private static validateReturnStructure(
 		ast: acorn.Node,
-		expectedProperties: Record<string, { type: string; description: string }>
+		expectedProperties: Record<string, { type: string; description: string }>,
+		targetFnName?: string
 	): string[] {
 		const warnings: string[] = [];
-		const foundReturns = this.collectTopLevelReturns(ast);
+		const foundReturns = this.collectTopLevelReturns(ast, targetFnName);
 
 		// Check if we have return statements
 		if (foundReturns.length === 0) {

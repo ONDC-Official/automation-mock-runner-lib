@@ -2,6 +2,7 @@ import { CodeValidator } from "../lib/validators/code-validator";
 import { getFunctionSchema } from "../lib/constants/function-registry";
 
 const validateSchema = getFunctionSchema("validate");
+const meetsRequirementsSchema = getFunctionSchema("meetsRequirements");
 
 describe("CodeValidator.validate — return structure", () => {
 	it("accepts an outer return with the full expected shape", () => {
@@ -69,6 +70,36 @@ describe("CodeValidator.validate — return structure", () => {
 	it("accepts a minified conditional return: return i ? {...} : {...}", () => {
 		const code = `function validate(i,d){return i?{valid:!0,code:200,description:"Valid request"}:{valid:!1,code:200,description:"oh no"}}`;
 		const result = CodeValidator.validate(code, validateSchema);
+		expect(result.errors).toEqual([]);
+		expect(result.isValid).toBe(true);
+	});
+
+	it("ignores sibling top-level helper function returns (validate)", () => {
+		const code = `
+			function x() {
+				return "hello";
+			}
+			function validate(targetPayload, sessionData) {
+				let some = x();
+				return { valid: true, code: 200, description: "Valid request" };
+			}
+		`;
+		const result = CodeValidator.validate(code, validateSchema);
+		expect(result.errors).toEqual([]);
+		expect(result.isValid).toBe(true);
+	});
+
+	it("ignores sibling top-level helper function returns (meetsRequirements)", () => {
+		const code = `
+			function helper() {
+				return 123;
+			}
+			function meetsRequirements(sessionData) {
+				const n = helper();
+				return { valid: true, code: 200, description: "Requirements met" };
+			}
+		`;
+		const result = CodeValidator.validate(code, meetsRequirementsSchema);
 		expect(result.errors).toEqual([]);
 		expect(result.isValid).toBe(true);
 	});
