@@ -3,6 +3,7 @@ import { getFunctionSchema } from "../lib/constants/function-registry";
 
 const validateSchema = getFunctionSchema("validate");
 const meetsRequirementsSchema = getFunctionSchema("meetsRequirements");
+const generateSchema = getFunctionSchema("generate");
 
 describe("CodeValidator.validate — return structure", () => {
 	it("accepts an outer return with the full expected shape", () => {
@@ -86,6 +87,32 @@ describe("CodeValidator.validate — return structure", () => {
 		`;
 		const result = CodeValidator.validate(code, validateSchema);
 		expect(result.errors).toEqual([]);
+		expect(result.warnings).toEqual([]);
+		expect(result.isValid).toBe(true);
+	});
+
+	it("does not warn 'should return a value' when target fn has a return (validate)", () => {
+		const code = `
+			function validate(targetPayload, sessionData) {
+				return { valid: true, code: 200, description: "Valid request" };
+			}
+		`;
+		const result = CodeValidator.validate(code, validateSchema);
+		expect(
+			result.warnings.some((w) => w.includes("should return a value"))
+		).toBe(false);
+	});
+
+	it("does not warn 'should return a value' for generate with a return", () => {
+		const code = `
+			async function generate(defaultPayload, sessionData) {
+				return defaultPayload;
+			}
+		`;
+		const result = CodeValidator.validate(code, generateSchema);
+		expect(
+			result.warnings.some((w) => w.includes("should return a value"))
+		).toBe(false);
 		expect(result.isValid).toBe(true);
 	});
 

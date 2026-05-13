@@ -415,7 +415,7 @@ export class CodeValidator {
 		schema: FunctionSchema
 	): string[] {
 		const warnings: string[] = [];
-		const hasReturn = this.collectTopLevelReturns(ast).length > 0;
+		const hasReturn = this.collectTopLevelReturns(ast, schema.name).length > 0;
 
 		if (!hasReturn) {
 			warnings.push(
