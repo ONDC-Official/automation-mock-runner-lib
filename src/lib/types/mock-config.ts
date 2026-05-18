@@ -74,6 +74,11 @@ export const MockPlaygroundConfigSchema = z.object({
 	meta: MetaSchema,
 	transaction_data: TransactionDataSchema,
 	steps: z.array(PlaygroundActionStepSchema),
+	extra_steps: z
+		.object({
+			steps: z.array(PlaygroundActionStepSchema),
+		})
+		.optional(),
 	transaction_history: z.array(TransactionHistoryItemSchema),
 	validationLib: z.string(),
 	helperLib: z.string(),
