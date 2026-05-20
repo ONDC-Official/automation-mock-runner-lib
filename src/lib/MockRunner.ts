@@ -831,13 +831,22 @@ export class MockRunner {
 
 	public static encodeBase64(input: string): string {
 		const bytes = new TextEncoder().encode(input);
-		return btoa(String.fromCharCode(...bytes));
+		const CHUNK = 0x8000;
+		let binary = "";
+		for (let i = 0; i < bytes.length; i += CHUNK) {
+			binary += String.fromCharCode.apply(
+				null,
+				bytes.subarray(i, i + CHUNK) as unknown as number[],
+			);
+		}
+		return btoa(binary);
 	}
 	public static decodeBase64(encoded: string): string {
 		const binaryString = atob(encoded);
-		const bytes = new Uint8Array(
-			[...binaryString].map((char) => char.charCodeAt(0)),
-		);
+		const bytes = new Uint8Array(binaryString.length);
+		for (let i = 0; i < binaryString.length; i++) {
+			bytes[i] = binaryString.charCodeAt(i);
+		}
 		return new TextDecoder().decode(bytes);
 	}
 
