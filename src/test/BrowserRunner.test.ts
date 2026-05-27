@@ -150,7 +150,9 @@ describe("BrowserRunner", () => {
 
 			expect(result.success).toBe(false);
 			expect(result.error).toBeDefined();
-			expect(result.error!.message).toContain("generate is not defined");
+			expect(result.error!.message).toContain(
+				"Expected a top-level function declaration named 'generate'",
+			);
 		});
 
 		it("should handle runtime errors in functions", async () => {

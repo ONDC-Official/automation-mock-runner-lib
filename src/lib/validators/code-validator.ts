@@ -137,8 +137,27 @@ export class CodeValidator {
 				errors.push(`[Line ${pattern.line}] ${pattern.message}`);
 			});
 
-			// 5. Validate return type structure (for validate and meetsRequirements)
-			if (schema.returnType.properties) {
+			// 5. Require the top-level function declaration the schema wraps with
+			//    (skipped for raw-code schemas like `getSave` whose template doesn't
+			//    define a named function). Without this, a typo'd name silently
+			//    degrades to a misleading "Function should return an object..." warning.
+			const expectedName = this.getExpectedDeclarationName(schema);
+			const hasNamedDecl = expectedName
+				? ((ast as any).body || []).some(
+						(n: any) =>
+							n.type === "FunctionDeclaration" && n.id?.name === expectedName
+					)
+				: true;
+			if (expectedName && !hasNamedDecl) {
+				errors.push(
+					`Expected a top-level function declaration named '${expectedName}' (check for typos or a missing/wrapping function)`
+				);
+			}
+
+			// 6. Validate return type structure (for validate and meetsRequirements).
+			//    Skipped when the named declaration is missing — the message would
+			//    duplicate the clearer error above.
+			if (schema.returnType.properties && hasNamedDecl) {
 				const returnValidation = this.validateReturnStructure(
 					ast,
 					schema.returnType.properties,
@@ -147,9 +166,11 @@ export class CodeValidator {
 				errors.push(...returnValidation);
 			}
 
-			// 6. Check for best practices
-			const practiceWarnings = this.checkBestPractices(ast, schema);
-			warnings.push(...practiceWarnings);
+			// 7. Check for best practices (skipped when declaration is missing)
+			if (hasNamedDecl) {
+				const practiceWarnings = this.checkBestPractices(ast, schema);
+				warnings.push(...practiceWarnings);
+			}
 		} catch (e: any) {
 			// Syntax error during parsing
 			let errorMessage = `Syntax Error: ${e.message}`;
@@ -189,6 +210,32 @@ export class CodeValidator {
 	 * functions/arrows are also skipped (they aren't the contract).
 	 * Falls back to the whole AST when no named match is found.
 	 */
+	/**
+	 * Returns the function name the schema's template wraps user code with
+	 * (e.g. "generate", "validate", "meetsRequirements"). Returns undefined for
+	 * raw-code schemas like `getSave` whose template is the identity function.
+	 */
+	private static getExpectedDeclarationName(
+		schema: FunctionSchema
+	): string | undefined {
+		try {
+			const ast = acorn.parse(schema.template(""), {
+				ecmaVersion: 2020,
+				sourceType: "script",
+			});
+			const body: any[] = Array.isArray((ast as any).body)
+				? (ast as any).body
+				: [];
+			const fn = body.find(
+				(n: any) =>
+					n.type === "FunctionDeclaration" && n.id?.name === schema.name
+			);
+			return fn ? schema.name : undefined;
+		} catch {
+			return undefined;
+		}
+	}
+
 	private static collectTopLevelReturns(
 		ast: acorn.Node,
 		targetFnName?: string
