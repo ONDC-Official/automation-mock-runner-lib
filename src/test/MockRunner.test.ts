@@ -874,4 +874,75 @@ describe("MockRunner", () => {
 			expect(result.success).toBe(true);
 		});
 	});
+
+	describe("extra steps support in *WithSession methods", () => {
+		let runner: MockRunner;
+
+		beforeEach(async () => {
+			const baseConfig: MockPlaygroundConfigType = {
+				meta: {
+					domain: "ONDC:TRV14",
+					version: "2.0.0",
+					flowId: "extra-steps-test",
+				},
+				transaction_data: {
+					transaction_id: "extra-steps-txn-id",
+					latest_timestamp: "1970-01-01T00:00:00.000Z",
+				},
+				steps: [],
+				transaction_history: [],
+				validationLib: "",
+				helperLib: "",
+			};
+			const base = new MockRunner(baseConfig, true);
+			base.getConfig().steps.push(base.getDefaultStep("search", "search_0"));
+			const optimized = await createOptimizedMockConfig(base.getConfig());
+			// createOptimizedMockConfig drops extra_steps, so attach an extra step
+			// (absent from main steps) after optimizing the main steps.
+			optimized.extra_steps = {
+				steps: [base.getDefaultStep("on_status", "on_status_0")],
+			};
+			runner = new MockRunner(optimized, true);
+		});
+
+		it("runGeneratePayloadWithSession resolves a step from extra_steps", async () => {
+			const result = await runner.runGeneratePayloadWithSession("on_status_0", {
+				transaction_id: "some-txn",
+			});
+			expect(result.success).toBe(true);
+		});
+
+		it("runValidatePayloadWithSession resolves a step from extra_steps", async () => {
+			const result = await runner.runValidatePayloadWithSession(
+				"on_status_0",
+				{ context: {}, message: {} },
+				{},
+			);
+			expect(result.success).toBe(true);
+		});
+
+		it("runMeetRequirementsWithSession resolves a step from extra_steps", async () => {
+			const result = await runner.runMeetRequirementsWithSession(
+				"on_status_0",
+				{},
+			);
+			expect(result.success).toBe(true);
+		});
+
+		it("main steps still resolve (main takes precedence over extras)", async () => {
+			const result = await runner.runGeneratePayloadWithSession("search_0", {
+				transaction_id: "some-txn",
+			});
+			expect(result.success).toBe(true);
+		});
+
+		it("an action id in neither main nor extra returns failure", async () => {
+			const result = await runner.runGeneratePayloadWithSession(
+				"not_a_real_action",
+				{},
+			);
+			expect(result.success).toBe(false);
+			expect(result.error?.message).toContain("not_a_real_action");
+		});
+	});
 });

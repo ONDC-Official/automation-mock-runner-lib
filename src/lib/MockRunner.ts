@@ -228,15 +228,10 @@ export class MockRunner {
 				},
 			);
 
-			const step = this.config.steps.find((s) => s.action_id === baseActionId);
+			const step = this.resolveStep(baseActionId);
 			if (!step) {
-				const availableActions = this.config.steps.map((s) => s.action_id);
-				throw new ActionNotFoundError(actionId, availableActions);
+				throw new ActionNotFoundError(actionId, this.allActionIds());
 			}
-
-			const index = this.config.steps.findIndex(
-				(s) => s.action_id === baseActionId,
-			);
 
 			// Deep clone to avoid mutations
 			const defaultPayload = JSON.parse(
@@ -358,7 +353,7 @@ export class MockRunner {
 	) {
 		try {
 			const baseActionId = MockRunner.resolveBaseActionId(actionId);
-			const step = this.config.steps.find((s) => s.action_id === baseActionId);
+			const step = this.resolveStep(baseActionId);
 			if (!step) {
 				throw new Error(`Action step with ID ${actionId} not found.`);
 			}
@@ -425,7 +420,7 @@ export class MockRunner {
 	) {
 		try {
 			const baseActionId = MockRunner.resolveBaseActionId(actionId);
-			const step = this.config.steps.find((s) => s.action_id === baseActionId);
+			const step = this.resolveStep(baseActionId);
 			if (!step) {
 				throw new Error(`Action step with ID ${actionId} not found.`);
 			}
@@ -582,7 +577,7 @@ export class MockRunner {
 		// get the last by splitting on # and taking the last part
 		const baseActionId = MockRunner.resolveBaseActionId(actionId);
 
-		const step = this.config.steps.find((s) => s.action_id === baseActionId);
+		const step = this.resolveStep(baseActionId);
 
 		// Determine the message_id based on responseFor logic
 		let messageId = uuidv4();
@@ -852,6 +847,26 @@ export class MockRunner {
 
 	private static resolveBaseActionId(actionId: string): string {
 		return actionId.split("#").slice(-1)[0];
+	}
+
+	// Resolve a step by base action id across main steps then extra steps.
+	private resolveStep(
+		baseActionId: string,
+	): MockPlaygroundConfigType["steps"][number] | undefined {
+		return (
+			this.config.steps.find((s) => s.action_id === baseActionId) ??
+			this.config.extra_steps?.steps.find(
+				(s) => s.action_id === baseActionId,
+			)
+		);
+	}
+
+	// All known action ids (main + extra), for error messages.
+	private allActionIds(): string[] {
+		return [
+			...this.config.steps.map((s) => s.action_id),
+			...(this.config.extra_steps?.steps.map((s) => s.action_id) ?? []),
+		];
 	}
 
 	private static getIdFromSession(
