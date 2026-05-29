@@ -1,5 +1,8 @@
 import { MockRunner } from "./MockRunner";
-import { MockPlaygroundConfigType } from "./types/mock-config";
+import {
+	MockPlaygroundConfigType,
+	PlaygroundActionStep,
+} from "./types/mock-config";
 import { v4 as uuidv4 } from "uuid";
 import { minify } from "terser";
 import { Flow } from "./types/flow-types";
@@ -39,127 +42,134 @@ export function createInitialMockConfig(
 	};
 }
 
+function buildFlowStep(
+	step: PlaygroundActionStep,
+	index: number,
+	steps: PlaygroundActionStep[],
+): any {
+	const pair =
+		steps.find((s) => s.responseFor === step.action_id)?.action_id || null;
+
+	let flowStep: any = {};
+	const isFormStep = [
+		"HTML_FORM",
+		"DYNAMIC_FORM",
+		"HTML_FORM_MULTI",
+		"dynamic_form",
+		"html_form",
+	];
+
+	// Check if previous step was a form step
+	const previousStep = index > 0 ? steps[index - 1] : null;
+	const isPreviousStepForm =
+		previousStep !== null && isFormStep.includes(previousStep.api);
+
+	// Check if current step has no inputs
+	const hasNoInputs =
+		step.mock.inputs === undefined ||
+		step.mock.inputs === null ||
+		Object.keys(step.mock.inputs).length === 0;
+
+	if (step.api === "dynamic_form") {
+		flowStep = {
+			key: step.action_id,
+			type: "DYNAMIC_FORM",
+			owner: step.owner,
+			description: step.description || "",
+			label: step.description || "FORM",
+			unsolicited: step.unsolicited,
+			pair: pair,
+			repeat: step.repeatCount || 1,
+			input: [
+				{
+					name: "form_submission_id",
+					label: "Enter form submission ID",
+					type: "DYNAMIC_FORM",
+					payloadField: "form_submission_id",
+					reference: `$.reference_data.${step.action_id}`,
+				},
+			],
+		};
+	} else if (step.api === "HTML_FORM" || step.api === "html_form") {
+		flowStep = {
+			key: step.action_id,
+			type: "HTML_FORM",
+			owner: step.owner,
+			description: step.description || "",
+			label: step.description || "FORM",
+			unsolicited: step.unsolicited,
+			pair: pair,
+			repeat: step.repeatCount || 1,
+			input: [
+				{
+					name: "form_submission_id",
+					label: "Enter form submission ID",
+					type: "HTML_FORM",
+					payloadField: "form_submission_id",
+					reference: `$.reference_data.${step.action_id}`,
+				},
+			],
+		};
+	} else {
+		flowStep = {
+			key: step.action_id,
+			type: step.api,
+			owner: step.owner,
+			description: step.description || "",
+			expect: index === 0 ? true : false,
+			unsolicited: step.unsolicited,
+			pair: pair,
+			repeat: step.repeatCount || 1,
+		};
+	}
+
+	if (
+		step.mock.inputs !== undefined &&
+		step.mock.inputs !== null &&
+		Object.keys(step.mock.inputs).length > 0
+	) {
+		if (step.mock.inputs.id == "finvu_verification") {
+			flowStep.input = [
+				{
+					name: "finvu_verification",
+					label: "Complete Account Aggregator Verification",
+					type: "FINVU_REDIRECT",
+					payloadField: "$.context.aa_consent_verified",
+				},
+			];
+		} else {
+			flowStep.input = [
+				{
+					name: step.mock.inputs.id,
+					type: step.mock.inputs.id,
+					schema: step.mock.inputs.jsonSchema,
+				},
+			];
+		}
+	}
+
+	if (step.mock.inputs?.oldInputs) {
+		flowStep.input = step.mock.inputs.oldInputs;
+	}
+
+	// Add force_proceed if previous step was a form and current step has no inputs
+	if (isPreviousStepForm && hasNoInputs) {
+		flowStep.force_proceed = true;
+	}
+
+	return flowStep;
+}
+
+function buildFlowSequence(steps: PlaygroundActionStep[]): any[] {
+	return steps.map((step, index) => buildFlowStep(step, index, steps));
+}
+
 export function convertToFlowConfig(config: MockPlaygroundConfigType) {
 	const flowConfig: any = {};
 	flowConfig.id = config.meta.flowId;
 	flowConfig.description = "";
-	flowConfig.sequence = [];
-	let index = 0;
-	for (const step of config.steps) {
-		const pair =
-			config.steps.find((s) => s.responseFor === step.action_id)?.action_id ||
-			null;
-
-		let flowStep: any = {};
-		const isFormStep = [
-			"HTML_FORM",
-			"DYNAMIC_FORM",
-			"HTML_FORM_MULTI",
-			"dynamic_form",
-			"html_form",
-		];
-
-		// Check if previous step was a form step
-		const previousStep = index > 0 ? config.steps[index - 1] : null;
-		const isPreviousStepForm =
-			previousStep !== null && isFormStep.includes(previousStep.api);
-
-		// Check if current step has no inputs
-		const hasNoInputs =
-			step.mock.inputs === undefined ||
-			step.mock.inputs === null ||
-			Object.keys(step.mock.inputs).length === 0;
-
-		if (step.api === "dynamic_form") {
-			flowStep = {
-				key: step.action_id,
-				type: "DYNAMIC_FORM",
-				owner: step.owner,
-				description: step.description || "",
-				label: step.description || "FORM",
-				unsolicited: step.unsolicited,
-				pair: pair,
-				repeat: step.repeatCount || 1,
-				input: [
-					{
-						name: "form_submission_id",
-						label: "Enter form submission ID",
-						type: "DYNAMIC_FORM",
-						payloadField: "form_submission_id",
-						reference: `$.reference_data.${step.action_id}`,
-					},
-				],
-			};
-		} else if (step.api === "HTML_FORM" || step.api === "html_form") {
-			flowStep = {
-				key: step.action_id,
-				type: "HTML_FORM",
-				owner: step.owner,
-				description: step.description || "",
-				label: step.description || "FORM",
-				unsolicited: step.unsolicited,
-				pair: pair,
-				repeat: step.repeatCount || 1,
-				input: [
-					{
-						name: "form_submission_id",
-						label: "Enter form submission ID",
-						type: "HTML_FORM",
-						payloadField: "form_submission_id",
-						reference: `$.reference_data.${step.action_id}`,
-					},
-				],
-			};
-		} else {
-			flowStep = {
-				key: step.action_id,
-				type: step.api,
-				owner: step.owner,
-				description: step.description || "",
-				expect: index === 0 ? true : false,
-				unsolicited: step.unsolicited,
-				pair: pair,
-				repeat: step.repeatCount || 1,
-			};
-		}
-
-		if (
-			step.mock.inputs !== undefined &&
-			step.mock.inputs !== null &&
-			Object.keys(step.mock.inputs).length > 0
-		) {
-			if (step.mock.inputs.id == "finvu_verification") {
-				flowStep.input = [
-					{
-						name: "finvu_verification",
-						label: "Complete Account Aggregator Verification",
-						type: "FINVU_REDIRECT",
-						payloadField: "$.context.aa_consent_verified",
-					},
-				];
-			} else {
-				flowStep.input = [
-					{
-						name: step.mock.inputs.id,
-						type: step.mock.inputs.id,
-						schema: step.mock.inputs.jsonSchema,
-					},
-				];
-			}
-		}
-
-		if (step.mock.inputs?.oldInputs) {
-			flowStep.input = step.mock.inputs.oldInputs;
-		}
-
-		// Add force_proceed if previous step was a form and current step has no inputs
-		if (isPreviousStepForm && hasNoInputs) {
-			flowStep.force_proceed = true;
-		}
-
-		flowConfig.sequence.push(flowStep);
-		index++;
-	}
+	flowConfig.sequence = buildFlowSequence(config.steps);
+	flowConfig.extraSequence = buildFlowSequence(config.extra_steps?.steps || []);
 	return flowConfig;
 }
 
