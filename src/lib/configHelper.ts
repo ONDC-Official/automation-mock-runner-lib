@@ -190,6 +190,20 @@ export async function createOptimizedMockConfig(
 		}),
 	);
 
+	const optimizedExtraSteps = config.extra_steps ? await Promise.all(
+		config.extra_steps.steps.map(async (step) => {
+			return {
+				...step,
+				mock: {
+					...step.mock,
+					generate: await getMinifiedCode(step.mock.generate),
+					validate: await getMinifiedCode(step.mock.validate),
+					requirements: await getMinifiedCode(step.mock.requirements),
+				},
+			};
+		})
+	) : [];
+
 	const optimizedConfig: MockPlaygroundConfigType = {
 		meta: config.meta,
 		transaction_history: [],
@@ -197,6 +211,9 @@ export async function createOptimizedMockConfig(
 		validationLib: config.validationLib,
 		transaction_data: config.transaction_data,
 		steps: optimizedSteps,
+		extra_steps: {
+			steps: optimizedExtraSteps,
+		}
 	};
 
 	return optimizedConfig;
