@@ -3,42 +3,22 @@ import {
 	MockPlaygroundConfigType,
 	PlaygroundActionStep,
 } from "./types/mock-config";
-import { v4 as uuidv4 } from "uuid";
 import { minify } from "terser";
 import { Flow } from "./types/flow-types";
 import { validateGoodConfig } from "./utils/validateConfig";
-import { DEFAULT_HELPER_LIB } from "./helpers";
+import { createBaseConfig } from "./utils/config-defaults";
 
 export function createInitialMockConfig(
 	domain: string,
 	version: string,
 	flowId: string,
 ): MockPlaygroundConfigType {
+	const base = createBaseConfig(domain, version);
 	return {
-		meta: {
-			domain,
-			version,
-			flowId,
-			config_version: "0.0.0001",
-			description: "",
-			use_case_id: "",
-		},
-		transaction_data: {
-			transaction_id: uuidv4(),
-			latest_timestamp: new Date(0).toISOString(),
-			bap_id: "bap.example.com",
-			bap_uri: "https://bap.example.com",
-			bpp_id: "bpp.example.com",
-			bpp_uri: "https://bpp.example.com",
-			external_session_data: {
-				finvuUrl: "https://dev-automation.ondc.org/finvu",
-				mockBaseUrl: "https://dev-automation.ondc.org/mock",
-			},
-		},
+		...base,
+		meta: { ...base.meta, flowId },
 		steps: [],
 		transaction_history: [],
-		validationLib: "",
-		helperLib: MockRunner.encodeBase64(DEFAULT_HELPER_LIB),
 	};
 }
 

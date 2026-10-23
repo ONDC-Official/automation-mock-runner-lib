@@ -7,6 +7,7 @@
 export * from "./lib/MockRunner";
 
 // Type definitions
+export * from "./lib/types/base-config";
 export * from "./lib/types/mock-config";
 export * from "./lib/types/execution-results";
 
@@ -19,6 +20,7 @@ export {
 	ValidationResult as InputValidationResult,
 } from "./lib/utils/input-validator";
 export * from "./lib/utils/performance-monitor";
+export * from "./lib/utils/playground-version";
 
 // Constants
 export * from "./lib/constants/function-registry";
@@ -35,3 +37,6 @@ export * from "./lib/constants/function-registry";
 export * from "./lib/configHelper";
 
 export * from "./lib/validators/code-validator";
+
+// v2 configs, the Protocol Studio format (experimental)
+export * from "./lib/v2";

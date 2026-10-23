@@ -15,6 +15,7 @@ import {
 } from "./constants/function-registry";
 import { ExecutionResult } from "./types/execution-results";
 import { v4 as uuidv4 } from "uuid";
+import * as base64 from "./utils/base64";
 
 export class MockRunner {
 	private config: MockPlaygroundConfigType;
@@ -825,24 +826,10 @@ export class MockRunner {
 	}
 
 	public static encodeBase64(input: string): string {
-		const bytes = new TextEncoder().encode(input);
-		const CHUNK = 0x8000;
-		let binary = "";
-		for (let i = 0; i < bytes.length; i += CHUNK) {
-			binary += String.fromCharCode.apply(
-				null,
-				bytes.subarray(i, i + CHUNK) as unknown as number[],
-			);
-		}
-		return btoa(binary);
+		return base64.encode(input);
 	}
 	public static decodeBase64(encoded: string): string {
-		const binaryString = atob(encoded);
-		const bytes = new Uint8Array(binaryString.length);
-		for (let i = 0; i < binaryString.length; i++) {
-			bytes[i] = binaryString.charCodeAt(i);
-		}
-		return new TextDecoder().decode(bytes);
+		return base64.decode(encoded);
 	}
 
 	private static resolveBaseActionId(actionId: string): string {
