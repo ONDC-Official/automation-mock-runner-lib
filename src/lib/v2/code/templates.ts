@@ -1,7 +1,12 @@
 import { getFunctionSchema } from "../../constants/function-registry";
 
 /** The step functions a V2 node writes. @experimental */
-export type StepFunctionKindV2 = "generate" | "validate" | "meetsRequirements";
+export type StepFunctionKindV2 =
+	| "generate"
+	| "validate"
+	| "meetsRequirements"
+	| "match"
+	| "exit";
 
 /** @experimental */
 export interface FunctionTemplateOptionsV2 {
@@ -104,6 +109,41 @@ export const getFunctionTemplateV2 = (
 				fn(
 					"function meetsRequirements(sessionData)",
 					`function meetsRequirements(sessionData: ${session}): StepCheckResult`,
+				),
+			].join("\n");
+		case "match":
+			return [
+				"/**",
+				` * Whether an incoming ${api} is *this* step at all — not whether it is`,
+				" * valid (that is validate's job). Only consulted where several steps are",
+				" * possible next and share an API: look at what tells them apart (a tag,",
+				" * a field's presence, a type) and return true only for this one.",
+				tag("param", payload, "payload The payload received."),
+				sessionTag,
+				tag("returns", "boolean", "true when the payload is this step."),
+				" */",
+				fn(
+					"function match(payload, sessionData)",
+					`function match(payload: ${payload}, sessionData: ${session}): boolean`,
+				),
+			].join("\n");
+		case "exit":
+			return [
+				"/**",
+				` * Whether ${api} has stopped repeating: the node runs again, right after`,
+				" * itself, until this returns true (e.g. until the order's status is",
+				" * COMPLETED or FAILED). sessionData already holds what this run saved.",
+				tag(
+					"param",
+					payload,
+					"payload The payload this run produced or received.",
+				),
+				sessionTag,
+				tag("returns", "boolean", "true to stop repeating and move on."),
+				" */",
+				fn(
+					"function exit(payload, sessionData)",
+					`function exit(payload: ${payload}, sessionData: ${session}): boolean`,
 				),
 			].join("\n");
 	}

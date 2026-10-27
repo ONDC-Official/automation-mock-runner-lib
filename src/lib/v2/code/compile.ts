@@ -12,6 +12,8 @@ export type UserCodeKindV2 =
 	| "generate"
 	| "validate"
 	| "meetsRequirements"
+	| "match"
+	| "exit"
 	| "helpers";
 
 /** @experimental */
@@ -273,7 +275,12 @@ export const compileUserCodeV2 = async (
 	// best-practice warnings ("should return a value") don't apply to a library.
 	const warnings = kind === "helpers" ? [] : validation.warnings.map(mapIssue);
 
-	if (kind === "validate" || kind === "meetsRequirements") {
+	if (
+		kind === "validate" ||
+		kind === "meetsRequirements" ||
+		kind === "match" ||
+		kind === "exit"
+	) {
 		for (const call of findHelperCalls(ast, helperNames)) {
 			warnings.push({
 				message: `${call.name}() is a helper: helpers are only available inside generate, so this call fails at runtime`,

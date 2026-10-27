@@ -72,11 +72,13 @@ v1 (one config per flow) and v2 (many flows in one config, `src/lib/v2/`, experi
 - **v1:** `types/mock-config.ts`, `MockRunner`, `configHelper` — schemas are `Base*.extend(...)`; the public shape is frozen (guarded by `src/test/config-layering.test.ts`).
 - **v2:** `MockRunnerV2`, `MockPlaygroundConfigV2Schema`, `createInitialMockConfigV2`. **v2 never imports a v1 module**; the layering test enforces it.
 
+**v2 graph executor** (`src/lib/v2/graph/`, experimental): `GraphExecutorV2` runs a flat `ProtocolGraphV2` step by step in any environment — `next()` (single successor / decision case / repeat-until node / fork resolved by a `JourneyV2` or an open-mode decision) and `runStep()` (v1's pipeline: `meetsRequirements` → `generate` with helpers prepended and `context` rebuilt by `buildContextV2` → `validate` → `applySaveDataV2`, one appended `GraphEventV2`). Sessions are immutable; session data is rebuilt from events (`rebuildSessionDataV2`). `graphFromV1ConfigV2` turns a v1 config into a linear graph so old configs run unchanged. `save-data.ts` / `context.ts` must stay byte-for-byte equivalent to `MockRunner.getSessionDataUpToStep` / `generateContext`; `v2-graph-*.test.ts` assert the parity against `MockRunner`.
+
 The version flag `meta.playground_version: "v2"` exists **only on v2**. A config without it is v1, so v1 data never needs a flag or migration. `isPlaygroundV2Config` (`utils/playground-version.ts`) is the cross-version check for code that receives a config of unknown version.
 
 ### Function registry
 
-`src/lib/constants/function-registry.ts` defines the four function kinds (`generate`, `validate`, `meetsRequirements`, `getSave`) — each has signature, timeout (generate: 35s, validate: 5s, meetsRequirements: 3s, getSave: 3s), a default body, and a JSDoc template used by `getDefaultStep`. When adding a new function kind, register it here; the runner looks up schema by name.
+`src/lib/constants/function-registry.ts` defines the function kinds (`generate`, `validate`, `meetsRequirements`, `getSave`, and for v2 graphs `decide` (decision nodes), `match` (recognition) and `exit` (repeat-until nodes)) — each has signature, timeout (generate: 45s, validate: 5s, meetsRequirements: 3s, getSave: 3s, decide / match / exit: 3s), a default body, and a JSDoc template used by `getDefaultStep`. When adding a new function kind, register it here; the runner looks up schema by name.
 
 ### configHelper
 
