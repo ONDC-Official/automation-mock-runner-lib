@@ -55,8 +55,8 @@ function makeScopedFetch() {
 			typeof input === "string"
 				? input
 				: input && typeof input.url === "string"
-				? input.url
-				: String(input);
+					? input.url
+					: String(input);
 		if (!isFetchAllowed(requestUrl)) {
 			throw new Error(
 				`fetch blocked: ${requestUrl} is not in the configured allowlist`,
@@ -70,76 +70,39 @@ function makeScopedFetch() {
 function createSandbox(functionName) {
 	const logs = [];
 
+	// One console argument as text. An Error made inside the vm context is not an
+	// instance of this realm's Error, and JSON.stringify gives "{}" for it, so it is
+	// recognised by shape and printed as "Name: message".
+	const formatArg = (arg) => {
+		try {
+			if (
+				arg &&
+				typeof arg === "object" &&
+				typeof arg.message === "string" &&
+				typeof arg.name === "string"
+			)
+				return `${arg.name}: ${arg.message}`;
+			return typeof arg === "object" ? JSON.stringify(arg) : String(arg);
+		} catch {
+			return "[Circular or Non-Serializable]";
+		}
+	};
+	const capture =
+		(type) =>
+		(...args) => {
+			logs.push({
+				type,
+				message: args.map(formatArg).join(" "),
+				timestamp: Date.now(),
+			});
+		};
+
 	// Safe console implementation that captures logs
 	const safeConsole = {
-		log: (...args) => {
-			logs.push({
-				type: "log",
-				message: args
-					.map((arg) => {
-						try {
-							return typeof arg === "object"
-								? JSON.stringify(arg)
-								: String(arg);
-						} catch {
-							return "[Circular or Non-Serializable]";
-						}
-					})
-					.join(" "),
-				timestamp: Date.now(),
-			});
-		},
-		error: (...args) => {
-			logs.push({
-				type: "error",
-				message: args
-					.map((arg) => {
-						try {
-							return typeof arg === "object"
-								? JSON.stringify(arg)
-								: String(arg);
-						} catch {
-							return "[Circular or Non-Serializable]";
-						}
-					})
-					.join(" "),
-				timestamp: Date.now(),
-			});
-		},
-		warn: (...args) => {
-			logs.push({
-				type: "warn",
-				message: args
-					.map((arg) => {
-						try {
-							return typeof arg === "object"
-								? JSON.stringify(arg)
-								: String(arg);
-						} catch {
-							return "[Circular or Non-Serializable]";
-						}
-					})
-					.join(" "),
-				timestamp: Date.now(),
-			});
-		},
-		info: (...args) => {
-			logs.push({
-				type: "log",
-				message: args
-					.map((arg) => {
-						try {
-							return typeof arg === "object"
-								? JSON.stringify(arg)
-								: String(arg);
-						} catch {
-							return "[Circular or Non-Serializable]";
-						}
-					})
-					.join(" "),
-				timestamp: Date.now(),
-			});
-		},
+		log: capture("log"),
+		error: capture("error"),
+		warn: capture("warn"),
+		info: capture("log"),
 	};
 
 	// Whitelist of safe global functions

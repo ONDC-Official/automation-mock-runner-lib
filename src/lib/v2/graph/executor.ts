@@ -464,7 +464,32 @@ export class GraphExecutorV2 {
 			run.error = run.generate.error?.message ?? "generate failed";
 			return { run, session };
 		}
-		const payload = run.generate.result as Record<string, unknown>;
+		// A generate that catches its own error and returns nothing "succeeds" with no
+		// payload; validate and saveData would then fail on it with a message that hides
+		// the cause. Fail here, naming it and what the code logged.
+		const generated = run.generate.result;
+		if (
+			generated === null ||
+			typeof generated !== "object" ||
+			Array.isArray(generated)
+		) {
+			const logged = (run.generate.logs ?? [])
+				.filter((l) => l.type === "error")
+				.map((l) => l.message)
+				.slice(-3);
+			// The Node worker hands an undefined result back as the string "undefined".
+			run.error = `generate returned ${
+				generated === undefined || generated === "undefined"
+					? "nothing"
+					: Array.isArray(generated)
+						? "an array"
+						: JSON.stringify(generated)
+			} instead of a payload object${
+				logged.length ? ` · it logged: ${logged.join(" | ")}` : ""
+			}`;
+			return { run, session };
+		}
+		const payload = generated as Record<string, unknown>;
 
 		if (code.validate) {
 			run.validate = await this.execute(

@@ -344,6 +344,32 @@ describe("GraphExecutorV2", () => {
 		expect(run.error).toMatch(/expected one of a/);
 	});
 
+	it("fails a step whose generate returns no payload, naming what it logged", async () => {
+		// The pattern that hid a missing helper in Studio live: the error is caught and
+		// logged, nothing is returned, and saveData later failed on an empty payload.
+		const graph: ProtocolGraphV2 = {
+			nodes: [
+				apiNode("search", "search", {
+					code: {
+						generate: b64(
+							`async function generate(defaultPayload, sessionData) { try { return missingHelper(defaultPayload); } catch (e) { console.error(e); } }`,
+						),
+					},
+				}),
+			],
+			edges: [],
+		};
+		const executor = new GraphExecutorV2(graph, options);
+		const session = executor.createSession({ mode: "open" });
+		const { run } = await executor.runStep(session, "search");
+		expect(run.ok).toBe(false);
+		expect(run.error).toBe(
+			"generate returned nothing instead of a payload object · it logged: ReferenceError: missingHelper is not defined",
+		);
+		// The step stops there: neither validate nor saveData ran on the missing payload.
+		expect(run.validate).toBeUndefined();
+	});
+
 	it("honours repeat.max, resetOn and on-demand nodes", async () => {
 		const graph: ProtocolGraphV2 = {
 			nodes: [

@@ -6,3 +6,5 @@ export * from "./session";
 export * from "./next";
 export * from "./executor";
 export * from "./from-v1";
+export * from "./driver";
+export * from "./live-schema";
