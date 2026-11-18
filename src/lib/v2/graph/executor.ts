@@ -47,6 +47,18 @@ const decodeOr = (encoded: string | undefined, fallback: string) => {
 	}
 };
 
+/** The latest main-path (not on-demand / re-triggered) event of a node. */
+const getLatestMainEventOfV2 = (
+	session: GraphSessionV2,
+	nodeId: string,
+): GraphEventV2 | undefined => {
+	for (let i = session.events.length - 1; i >= 0; i -= 1) {
+		const event = session.events[i];
+		if (event.nodeId === nodeId && !event.extra) return event;
+	}
+	return undefined;
+};
+
 const failed = (name: string, message: string): ExecutionResult => ({
 	timestamp: new Date().toISOString(),
 	success: false,
@@ -442,7 +454,7 @@ export class GraphExecutorV2 {
 		const defaultPayload = JSON.parse(
 			JSON.stringify(node.defaultPayload ?? {}),
 		) as Record<string, unknown>;
-		const messageId = this.messageIdFor(node, session, sessionData);
+		const messageId = this.messageIdFor(node, session, sessionData, isExtra);
 		defaultPayload.context = buildContextV2({
 			domain: this.options.domain,
 			version: this.options.version,
@@ -648,15 +660,25 @@ export class GraphExecutorV2 {
 	/**
 	 * v1's rule: a callback reuses its request's message_id — from the session's
 	 * `latestMessage_id` when set, else the request's own event; anything else
-	 * gets a fresh id.
+	 * gets a fresh id. A main-path callback reads both from the main path only:
+	 * an on-demand run in between (a `status` between `init` and `on_init`)
+	 * saved its own message_id, which is not the one being answered. An extra
+	 * run keeps reading the whole session, as before.
 	 */
 	private messageIdFor(
 		node: GraphNodeV2,
 		session: GraphSessionV2,
 		sessionData: Record<string, unknown>,
+		extra: boolean,
 	): string {
 		if (!node.responseFor) return uuidv4();
-		const latest = sessionData.latestMessage_id;
+		const data = extra
+			? sessionData
+			: this.getSessionData({
+					...session,
+					events: session.events.filter((e) => !e.extra),
+				});
+		const latest = data.latestMessage_id;
 		if (
 			Array.isArray(latest) &&
 			latest.length > 0 &&
@@ -664,8 +686,11 @@ export class GraphExecutorV2 {
 		) {
 			return latest[0];
 		}
+		const request =
+			(extra ? undefined : getLatestMainEventOfV2(session, node.responseFor)) ??
+			getLatestEventV2(session, node.responseFor);
 		// A skipped request has no message_id to answer: a fresh one, as for any other step.
-		return getLatestEventV2(session, node.responseFor)?.messageId || uuidv4();
+		return request?.messageId || uuidv4();
 	}
 
 	private makeEvent(

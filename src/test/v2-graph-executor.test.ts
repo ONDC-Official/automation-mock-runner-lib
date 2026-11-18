@@ -412,6 +412,41 @@ describe("GraphExecutorV2", () => {
 		).toEqual(["status"]);
 	});
 
+	it("pairs a callback with its request across an on-demand run in between", async () => {
+		const graph: ProtocolGraphV2 = {
+			nodes: [
+				apiNode("init", "init"),
+				apiNode("on_init", "on_init", { responseFor: "init" }),
+				apiNode("status", "status", { kind: "on_demand" }),
+			],
+			edges: [{ id: "a", from: "init", to: "on_init", kind: "response" }],
+		};
+		const executor = new GraphExecutorV2(graph, options);
+		let session = executor.createSession({ mode: "open" });
+		session = (await executor.runStep(session, "init")).session;
+		const initId = session.events[0].messageId;
+
+		const status = await executor.runStep(session, "status");
+		expect(status.run.event?.extra).toBe(true);
+		session = status.session;
+		const statusId = session.events[1].messageId;
+		expect(statusId).not.toBe(initId);
+		// The on-demand run saved its own message_id over init's...
+		expect(executor.getSessionData(session).latestMessage_id).toEqual([
+			statusId,
+		]);
+
+		// ...but on_init still answers init.
+		const onInit = await executor.runStep(session, "on_init");
+		expect(onInit.run.ok).toBe(true);
+		expect((onInit.run.event?.payload as any).context.message_id).toBe(initId);
+		expect(onInit.run.event?.messageId).toBe(initId);
+
+		// An extra run reads the whole session, as before.
+		const again = await executor.runStep(session, "on_init", { extra: true });
+		expect(again.run.event?.messageId).toBe(statusId);
+	});
+
 	it("skips an optional node and refuses to skip a mandatory one or a decision", async () => {
 		const graph: ProtocolGraphV2 = {
 			nodes: [

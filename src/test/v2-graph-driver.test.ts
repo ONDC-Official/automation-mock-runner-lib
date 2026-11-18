@@ -313,6 +313,28 @@ describe("graph run driver", () => {
 		expect(planV2(executor, state, null).kind).toBe("end");
 	});
 
+	it("keeps a callback paired with its request when an on-demand node is triggered between them", async () => {
+		const graph: ProtocolGraphV2 = {
+			nodes: [
+				...linear.nodes,
+				apiNode("status", "status", { kind: "on_demand" }),
+			],
+			edges: linear.edges,
+		};
+		const executor = new GraphExecutorV2(graph, options);
+		let state = (await stepV2(executor, createGraphRunV2(executor, {}), null))
+			.state;
+		const searchId = state.session.events[0].messageId;
+		const triggered = await triggerV2(executor, state, "status");
+		expect(triggered.run?.ok).toBe(true);
+		state = triggered.state;
+		expect(state.session.events[1].messageId).not.toBe(searchId);
+
+		const step = await stepV2(executor, state, null);
+		expect(step.run?.nodeId).toBe("on_search");
+		expect((step.run?.event?.payload as any).context.message_id).toBe(searchId);
+	});
+
 	it("finishes only at an end-marked node", async () => {
 		const graph: ProtocolGraphV2 = {
 			nodes: [
