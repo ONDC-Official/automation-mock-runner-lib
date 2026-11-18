@@ -154,6 +154,7 @@ export const nextStepsV2 = (
 			return done({
 				end: true,
 				failed: true,
+				cause: "exit",
 				reason: `The exit condition of "${from.id}" was not met after ${runs} run${runs === 1 ? "" : "s"}`,
 			});
 		}
@@ -170,7 +171,9 @@ export const nextStepsV2 = (
 		return target ? isMainWire(edge, target) : false;
 	});
 
-	// A decision: follow the case its decide returned.
+	// A decision: follow the case its decide returned. A decision does not
+	// pass over a repeat limit: going round a loop once more than `max` allows
+	// fails the run, as a repeat-until node's limit does.
 	if (from.kind === "decision") {
 		const wire = wires.find((edge) => edge.case === last.case);
 		if (!wire) {
@@ -179,7 +182,17 @@ export const nextStepsV2 = (
 				reason: `Decision "${from.id}" decided "${last.case ?? ""}", which has no wire`,
 			});
 		}
-		return done({ auto: index.byId.get(wire.to) ?? null, canEnd });
+		const target = index.byId.get(wire.to) ?? null;
+		if (target && isRepeatExhaustedV2(target, session)) {
+			const runs = session.counters[target.id] ?? 0;
+			return done({
+				end: true,
+				failed: true,
+				cause: "repeat",
+				reason: `Decision "${from.id}" decided "${last.case ?? ""}", but "${target.id}" has already run ${runs} time${runs === 1 ? "" : "s"}, its repeat limit`,
+			});
+		}
+		return done({ auto: target, canEnd });
 	}
 
 	if (wires.length === 0) return done({ end: true, canEnd });

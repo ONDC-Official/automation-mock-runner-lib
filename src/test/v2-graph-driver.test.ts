@@ -289,6 +289,96 @@ describe("graph run driver", () => {
 		expect(getRunStatusV2(executor, out.state, journey).who).toBe("failed");
 	});
 
+	it("fails with the cause of each rule that stops a run", async () => {
+		const loop = (patch: Partial<GraphNodeV2>, decide: string) =>
+			new GraphExecutorV2(
+				{
+					nodes: [
+						apiNode("status", "status", patch),
+						{
+							id: "again",
+							api: "decision",
+							owner: "BAP",
+							kind: "decision",
+							cases: ["again"],
+							code: { decide: b64(decide) },
+						},
+					],
+					edges: [
+						{ id: "a", from: "status", to: "again", kind: "next" },
+						{
+							id: "b",
+							from: "again",
+							to: "status",
+							kind: "branch",
+							case: "again",
+						},
+					],
+				},
+				options,
+			);
+
+		// exit: a repeat-until node reached its limit before its exit condition.
+		const exit = new GraphExecutorV2(
+			{
+				nodes: [
+					apiNode("status", "status", {
+						code: {
+							generate: template("generate"),
+							exit: b64(
+								`function exit(payload, sessionData) { return false; }`,
+							),
+						},
+						repeat: { max: 2, until: true },
+					}),
+				],
+				edges: [],
+			},
+			options,
+		);
+		const exited = await runUntilV2(exit, createGraphRunV2(exit, {}), null);
+		expect(exited.steps.at(-1)?.plan).toMatchObject({
+			kind: "failed",
+			nodeId: "status",
+			cause: "exit",
+		});
+		expect(exited.state.failure).toMatchObject({
+			nodeId: "status",
+			cause: "exit",
+		});
+
+		// repeat: a decision led back into a node that has run its repeat.max.
+		const repeat = loop(
+			{ start: true, repeat: { max: 2 } },
+			`function decide(s) { return "again"; }`,
+		);
+		const repeated = await runUntilV2(
+			repeat,
+			createGraphRunV2(repeat, {}),
+			null,
+		);
+		expect(repeated.state.runs.map((r) => r.nodeId)).toEqual([
+			"status",
+			"again",
+			"status",
+			"again",
+		]);
+		expect(repeated.steps.at(-1)?.plan).toMatchObject({
+			kind: "failed",
+			nodeId: "again",
+			cause: "repeat",
+		});
+		expect(repeated.state.failure?.cause).toBe("repeat");
+		expect(planV2(repeat, repeated.state, null)).toEqual({
+			kind: "stopped",
+			reason: "failure",
+		});
+		// Stored state round-trips with its cause.
+		expect(JSON.parse(JSON.stringify(repeated.state)).failure.cause).toBe(
+			"repeat",
+		);
+	});
+
 	it("triggers on-demand nodes off the main path, asking for inputs first", async () => {
 		const graph: ProtocolGraphV2 = {
 			nodes: [

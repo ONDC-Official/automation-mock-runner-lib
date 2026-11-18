@@ -6,6 +6,7 @@ import type {
 	GraphSessionV2,
 	JourneyV2,
 	RecogniseResultV2,
+	RunFailureCauseV2,
 	StepRunV2,
 } from "./types";
 
@@ -39,10 +40,17 @@ export interface RunDeviationV2 {
 	actual: string;
 }
 
-/** The run can't go on correctly (a repeat-until node never met its exit). @experimental */
+/**
+ * The run can't go on correctly: a repeat-until node never met its exit, a
+ * decision looped past a repeat limit, … `cause` says which rule it was;
+ * absent on a state stored before causes existed.
+ *
+ * @experimental
+ */
 export interface RunFailureV2 {
 	nodeId: string;
 	reason: string;
+	cause?: RunFailureCauseV2;
 }
 
 /**
@@ -68,8 +76,8 @@ export interface GraphRunStateV2 {
  * - `inputs` / `form`: the node waits for tester inputs / a form submission.
  * - `await`: the counterparty's node — wait for its payload (`receiveV2`).
  * - `fork`: alternatives nothing picks (open mode).
- * - `end`: nothing follows; `failed`: the run can't go on; `stopped`: the run
- *   already finished, deviated or failed.
+ * - `end`: nothing follows; `failed`: the run can't go on (`cause` says which
+ *   rule); `stopped`: the run already finished, deviated or failed.
  *
  * @experimental
  */
@@ -81,7 +89,12 @@ export type GraphPlanV2 =
 	| { kind: "await"; node: GraphNodeV2; candidates: GraphNodeV2[] }
 	| { kind: "fork"; fork: ForkV2 }
 	| { kind: "end"; canEnd: boolean; reason?: string }
-	| { kind: "failed"; nodeId: string; reason: string }
+	| {
+			kind: "failed";
+			nodeId: string;
+			reason: string;
+			cause?: RunFailureCauseV2;
+	  }
 	| { kind: "stopped"; reason: "finished" | "deviation" | "failure" };
 
 /** @experimental */
@@ -167,6 +180,7 @@ export const planV2 = (
 			kind: "failed",
 			nodeId: lastMainNodeId(state),
 			reason: next.reason ?? "The run cannot go on",
+			...(next.cause ? { cause: next.cause } : {}),
 		};
 	}
 	if (next.fork) return { kind: "fork", fork: next.fork };
@@ -262,7 +276,11 @@ export const stepV2 = async (
 			logs.push({ level: "error", message: plan.reason });
 			return done("failed", {
 				...state,
-				failure: { nodeId: plan.nodeId, reason: plan.reason },
+				failure: {
+					nodeId: plan.nodeId,
+					reason: plan.reason,
+					...(plan.cause ? { cause: plan.cause } : {}),
+				},
 			});
 		case "fork":
 			if (journey)

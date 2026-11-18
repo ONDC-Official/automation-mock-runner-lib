@@ -95,7 +95,8 @@ export interface GraphNodeV2 {
 	 * How many times the node may run in one session; `resetOn` zeroes the
 	 * count when that node runs. `until`: the node runs again, right after
 	 * itself, until its `code.exit` returns true; reaching `max` first fails
-	 * the run (`NextV2.failed`).
+	 * the run (`NextV2.failed`, cause `exit`). A decision that leads back into
+	 * a node that has run `max` times fails the run too (cause `repeat`).
 	 */
 	repeat?: { max: number | "unbounded"; resetOn?: string; until?: boolean };
 	/**
@@ -209,6 +210,19 @@ export interface ForkV2 {
 }
 
 /**
+ * Why a run cannot go on:
+ * - `exit`: a `repeat.until` node ran `repeat.max` times without its exit
+ *   condition being met;
+ * - `repeat`: a decision chose a node that has already run `repeat.max` times;
+ * - `no-wire`: a decision returned a case that no wire leads out on;
+ * - `requirements`: a step's `meetsRequirements` said no (or failed to run)
+ *   in a run that blocks on it (`DriverOptionsV2.requirements`).
+ *
+ * @experimental
+ */
+export type RunFailureCauseV2 = "exit" | "repeat" | "no-wire" | "requirements";
+
+/**
  * What can happen next. At most one `auto` node per call: the executor is
  * step-by-step, so hosts can show each step.
  *
@@ -227,8 +241,14 @@ export interface NextV2 {
 	reason?: string;
 	/** The last step is marked `end`: the host may finish the run here, though wires lead on. */
 	canEnd?: boolean;
-	/** The run cannot go on correctly (a `repeat.until` node ran `max` times without exiting); `reason` says why. */
+	/**
+	 * The run cannot go on correctly: a `repeat.until` node ran `max` times
+	 * without exiting, or a decision chose a node that has run its `repeat.max`.
+	 * `reason` says why, `cause` which rule it was.
+	 */
 	failed?: boolean;
+	/** With `failed`: which rule stopped the run. */
+	cause?: RunFailureCauseV2;
 }
 
 /** @experimental */

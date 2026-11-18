@@ -784,8 +784,59 @@ describe("GraphExecutorV2: start / end marks and exit conditions", () => {
 		]);
 		expect(walk.next.end).toBe(true);
 		expect(walk.next.failed).toBe(true);
+		expect(walk.next.cause).toBe("exit");
 		expect(walk.next.reason).toMatch(
 			/exit condition of "on_status" was not met after 2 runs/,
+		);
+	});
+
+	it("fails the run when a decision loops back into a node past its repeat limit", async () => {
+		const graph: ProtocolGraphV2 = {
+			nodes: [
+				apiNode("confirm", "confirm"),
+				apiNode("status", "status", { repeat: { max: 2 } }),
+				{
+					id: "again",
+					api: "decision",
+					owner: "BAP",
+					kind: "decision",
+					cases: ["again", "done"],
+					code: { decide: b64(`function decide(s) { return "again"; }`) },
+				},
+				apiNode("rate", "rating"),
+			],
+			edges: [
+				{ id: "a", from: "confirm", to: "status", kind: "next" },
+				{ id: "b", from: "status", to: "again", kind: "next" },
+				{
+					id: "c",
+					from: "again",
+					to: "status",
+					kind: "branch",
+					case: "again",
+				},
+				{ id: "d", from: "again", to: "rate", kind: "branch", case: "done" },
+			],
+		};
+		const executor = new GraphExecutorV2(graph, options);
+		const walk = await runAll(
+			executor,
+			executor.createSession({ mode: "open" }),
+			null,
+		);
+		expect(walk.runs.map((r) => r.nodeId)).toEqual([
+			"confirm",
+			"status",
+			"again",
+			"status",
+			"again",
+		]);
+		expect(walk.next.auto).toBeNull();
+		expect(walk.next.end).toBe(true);
+		expect(walk.next.failed).toBe(true);
+		expect(walk.next.cause).toBe("repeat");
+		expect(walk.next.reason).toMatch(
+			/"again" decided "again", but "status" has already run 2 times/,
 		);
 	});
 
