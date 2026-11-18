@@ -346,6 +346,61 @@ From `@ondc/automation-mock-runner` (via `configHelper.ts`):
 - `createOptimizedMockConfig(config)` — Terser-minify each step's `generate` / `validate` / `requirements`.
 - `validateConfigForDeployment(config)` — stricter pre-publish check (throws on problems).
 
+## v2 configs and the graph executor (experimental)
+
+v2 is the config format Protocol Studio edits: many flows in one config, flagged with `meta.playground_version: "v2"`. A config without the flag is v1 and runs exactly as before. Everything below is exported from the package root, marked `@experimental` and may still change.
+
+- **Configs:** `MockRunnerV2`, `MockPlaygroundConfigV2Schema`, `createInitialMockConfigV2`, and `isPlaygroundV2Config` for code that receives a config of either version.
+- **`GraphExecutorV2`** runs a flat `ProtocolGraphV2` (nodes, plus wires between them) step by step, in Node or the browser. `next(session, journey)` says what follows. `runStep` runs v1's pipeline in v1's sandbox: `meetsRequirements` → `generate` → `validate` → `saveData`. `recognise` and `receive` take a payload from the counterparty. Sessions are immutable and JSON-serialisable, and session data is rebuilt from their events. `graphFromV1ConfigV2` turns a v1 config into a linear graph.
+- **The run driver** keeps the rules of a run in one place, so a simulation and a mock service behave the same:
+  - `createGraphRunV2` and `planV2`.
+  - `stepV2` and `runUntilV2`, `receiveV2`, `triggerV2`.
+  - `settleV2`, `skipNextV2`, `chooseV2` and `finishV2`.
+  - `getRunStatusV2`.
+
+  A run plays `"BAP"`, `"BPP"` or `"both"`. When it can't go on, `state.failure.cause` says why:
+  - `exit`: a repeat-until node never met its exit.
+  - `repeat`: a decision looped past a repeat limit.
+  - `no-wire`: a decided case has no wire.
+  - `requirements`: `meetsRequirements` said no in a run that blocks on it.
+
+- **Live sessions:** `LiveGraphConfigV2Schema` / `parseLiveGraphConfigV2` define the graph document a live mock session stores.
+
+```typescript
+import {
+	GraphExecutorV2,
+	createGraphRunV2,
+	settleV2,
+	stepV2,
+	receiveV2,
+} from "@ondc/automation-mock-runner";
+
+const executor = new GraphExecutorV2(graph, {
+	domain: "ONDC:TRV11",
+	version: "2.0.1",
+	transactionData,
+});
+let state = createGraphRunV2(executor, { journey });
+
+// A mock playing the BPP: pass decisions and skips, then see who opens.
+const settled = await settleV2(executor, state, journey, { plays: "BPP" });
+state = settled.state;
+if (settled.plan.kind === "await") {
+	// wait for the participant's payload, then:
+	state = (await receiveV2(executor, state, journey, payload, { plays: "BPP" }))
+		.state;
+}
+
+const step = await stepV2(executor, state, journey, { plays: "BPP" });
+if (step.outcome === "ran" && step.run?.event) send(step.run.event.payload);
+// Playing one side, a failing meetsRequirements blocks the step, as in v1.
+// For a callback, the event is v1's REQUIREMENTS_NOT_MET error payload:
+if (step.run?.requirementsFailed && step.run.event)
+	send(step.run.event.payload);
+```
+
+When playing one side, `stepV2` defaults to `requirements: "block"`. When playing both, it defaults to `"record"`, which warns and generates anyway. Pass `skipRequirements: true` to skip the check entirely.
+
 ## Error handling
 
 Every `run*` method returns an `ExecutionResult`:

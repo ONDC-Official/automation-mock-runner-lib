@@ -1,26 +1,22 @@
 import { z } from "zod";
+import {
+	BaseMetaSchema,
+	BasePlaygroundConfigSchema,
+	TransactionDataSchema,
+} from "./base-config";
+
+// v1 config: one config per flow. Built on the shared base; v1 carries no
+// playground_version flag (its absence is what marks a config as v1).
+
+export { TransactionDataSchema };
+export type { TransactionData } from "./base-config";
 
 // Zod schemas
 export const OwnerSchema = z.enum(["BAP", "BPP"]);
 
-export const MetaSchema = z.object({
-	domain: z.string().min(1, "Domain is required"),
-	version: z.string().min(1, "Version is required"),
+export const MetaSchema = BaseMetaSchema.extend({
 	flowId: z.string().min(1, "Flow ID is required"),
-	config_version: z.string().optional(),
-	description: z.string().optional(),
-	use_case_id: z.string().optional(),
 	flowName: z.string().optional(),
-});
-
-export const TransactionDataSchema = z.object({
-	transaction_id: z.string().min(1, "Transaction ID is required"),
-	latest_timestamp: z.string().min(1, "Latest timestamp is required"),
-	bap_id: z.string().optional(),
-	bap_uri: z.string().min(1, "BAP URI is required").optional(),
-	bpp_id: z.string().min(1, "BPP ID is required").optional(),
-	bpp_uri: z.string().min(1, "BPP URI is required").optional(),
-	external_session_data: z.record(z.string(), z.any()).optional(),
 });
 
 export const MockConfigSchema = z.object({
@@ -70,9 +66,8 @@ export const TransactionHistoryItemSchema = z.object({
 	saved_info: z.record(z.string(), z.any()),
 });
 
-export const MockPlaygroundConfigSchema = z.object({
+export const MockPlaygroundConfigSchema = BasePlaygroundConfigSchema.extend({
 	meta: MetaSchema,
-	transaction_data: TransactionDataSchema,
 	steps: z.array(PlaygroundActionStepSchema),
 	extra_steps: z
 		.object({
@@ -80,14 +75,11 @@ export const MockPlaygroundConfigSchema = z.object({
 		})
 		.optional(),
 	transaction_history: z.array(TransactionHistoryItemSchema),
-	validationLib: z.string(),
-	helperLib: z.string(),
 });
 
 // Inferred types from Zod schemas
 export type Owner = z.infer<typeof OwnerSchema>;
 export type Meta = z.infer<typeof MetaSchema>;
-export type TransactionData = z.infer<typeof TransactionDataSchema>;
 export type MockConfig = z.infer<typeof MockConfigSchema>;
 export type PlaygroundActionStep = z.infer<typeof PlaygroundActionStepSchema>;
 export type TransactionHistoryItem = z.infer<

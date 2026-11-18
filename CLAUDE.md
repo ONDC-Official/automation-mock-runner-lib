@@ -35,7 +35,7 @@ Library turns a **base64-encoded JS config** into an executable ONDC flow. Each 
 
 ### Execution path
 
-`MockRunner` (`src/lib/MockRunner.ts`) is the only public entry point most callers need. On each `runGeneratePayload` / `runValidatePayload` / `runMeetRequirements` call:
+`MockRunner` (`src/lib/MockRunner.ts`) is the only public entry point most v1 callers need (see "v2 configs (Protocol Studio) & layering" for `MockRunnerV2`). On each `runGeneratePayload` / `runValidatePayload` / `runMeetRequirements` call:
 
 1. Resolve `actionId` → `baseActionId` via `resolveBaseActionId` (splits on `#`, takes last segment — IDs like `GENERATED#1#search` are legal).
 2. Build `sessionData` from `transaction_history` using each prior step's `saveData` JSONPath map (`getSessionDataUpToStep`). Special prefixes:
@@ -62,9 +62,23 @@ Zod schemas in `src/lib/types/mock-config.ts` define the canonical shape. `MockP
 
 Functions must be **base64**. Use `MockRunner.encodeBase64(src)` / `decodeBase64` (the class statics are the sanctioned helpers — they use `TextEncoder`/`TextDecoder`, not `Buffer`, so they work in both environments).
 
+### v2 configs (Protocol Studio) & layering
+
+**Protocol Studio** is the frontend product (formerly "Playground v2"); **v2** is the config format it edits. The lib names the format, not the product, so its identifiers stay `*V2` / `v2`.
+
+v1 (one config per flow) and v2 (many flows in one config, `src/lib/v2/`, experimental) both branch from a shared base that knows neither:
+
+- **Shared:** `types/base-config.ts` (`BaseMetaSchema`, `TransactionDataSchema`, `BasePlaygroundConfigSchema`), `utils/base64.ts`, `utils/config-defaults.ts` (`createBaseConfig`), plus the runners, validators and helpers.
+- **v1:** `types/mock-config.ts`, `MockRunner`, `configHelper` — schemas are `Base*.extend(...)`; the public shape is frozen (guarded by `src/test/config-layering.test.ts`).
+- **v2:** `MockRunnerV2`, `MockPlaygroundConfigV2Schema`, `createInitialMockConfigV2`. **v2 never imports a v1 module**; the layering test enforces it.
+
+**v2 graph executor** (`src/lib/v2/graph/`, experimental): `GraphExecutorV2` runs a flat `ProtocolGraphV2` step by step in any environment — `next()` (single successor / decision case / repeat-until node / fork resolved by a `JourneyV2` or an open-mode decision) and `runStep()` (v1's pipeline: `meetsRequirements` → `generate` with helpers prepended and `context` rebuilt by `buildContextV2` → `validate` → `applySaveDataV2`, one appended `GraphEventV2`). Sessions are immutable; session data is rebuilt from events (`rebuildSessionDataV2`). `graphFromV1ConfigV2` turns a v1 config into a linear graph so old configs run unchanged. `save-data.ts` / `context.ts` must stay byte-for-byte equivalent to `MockRunner.getSessionDataUpToStep` / `generateContext`; `v2-graph-*.test.ts` assert the parity against `MockRunner`.
+
+The version flag `meta.playground_version: "v2"` exists **only on v2**. A config without it is v1, so v1 data never needs a flag or migration. `isPlaygroundV2Config` (`utils/playground-version.ts`) is the cross-version check for code that receives a config of unknown version.
+
 ### Function registry
 
-`src/lib/constants/function-registry.ts` defines the four function kinds (`generate`, `validate`, `meetsRequirements`, `getSave`) — each has signature, timeout (generate: 35s, validate: 5s, meetsRequirements: 3s, getSave: 3s), a default body, and a JSDoc template used by `getDefaultStep`. When adding a new function kind, register it here; the runner looks up schema by name.
+`src/lib/constants/function-registry.ts` defines the function kinds (`generate`, `validate`, `meetsRequirements`, `getSave`, and for v2 graphs `decide` (decision nodes), `match` (recognition) and `exit` (repeat-until nodes)) — each has signature, timeout (generate: 45s, validate: 5s, meetsRequirements: 3s, getSave: 3s, decide / match / exit: 3s), a default body, and a JSDoc template used by `getDefaultStep`. When adding a new function kind, register it here; the runner looks up schema by name.
 
 ### configHelper
 

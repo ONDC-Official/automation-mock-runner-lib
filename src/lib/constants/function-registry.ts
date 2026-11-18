@@ -4,7 +4,10 @@ export type FunctionNamesType =
 	| "generate"
 	| "validate"
 	| "meetsRequirements"
-	| "getSave";
+	| "getSave"
+	| "decide"
+	| "match"
+	| "exit";
 export interface FunctionParameter {
 	name: string;
 	type: string;
@@ -146,6 +149,95 @@ ${body}
  * @returns {Object} { valid: boolean, code: number, description: string }
  */
 function meetsRequirements(sessionData) {
+${body}
+}`,
+	},
+	/** A v2 decision node's function: picks the case whose wire the protocol follows. */
+	decide: {
+		name: "decide",
+		parameters: [
+			{
+				name: "sessionData",
+				type: "Object",
+				description: "Data collected from previous transaction steps",
+				required: true,
+			},
+		],
+		returnType: {
+			type: "string",
+			description: "The case to follow: one of the decision's cases",
+		},
+		description: "Decides which case of a decision node the protocol takes",
+		timeout: 3000,
+		defaultBody: `  return "yes";`,
+		template: (body: string) => `function decide(sessionData) {
+${body}
+}`,
+	},
+	/**
+	 * A v2 node's recogniser: whether an incoming payload is this step at all.
+	 * Only consulted where several steps are possible next (alternatives) and
+	 * share an API; `validate` then checks whether it is a *correct* one.
+	 */
+	match: {
+		name: "match",
+		parameters: [
+			{
+				name: "payload",
+				type: "Object",
+				description: "The incoming payload to recognise",
+				required: true,
+			},
+			{
+				name: "sessionData",
+				type: "Object",
+				description: "Data collected from previous transaction steps",
+				required: true,
+			},
+		],
+		returnType: {
+			type: "boolean",
+			description: "true when the payload is this step",
+		},
+		description:
+			"Recognises whether an incoming payload is this step (not whether it is valid)",
+		timeout: 3000,
+		defaultBody: `  return true;`,
+		template: (body: string) => `function match(payload, sessionData) {
+${body}
+}`,
+	},
+	/**
+	 * A v2 node's exit condition: the node runs again, right after itself,
+	 * until this returns true (e.g. an unsolicited on_status repeating until
+	 * the order is COMPLETED). Runs after the step's saveData, so sessionData
+	 * already holds what this run saved.
+	 */
+	exit: {
+		name: "exit",
+		parameters: [
+			{
+				name: "payload",
+				type: "Object",
+				description: "The payload this run produced (or received)",
+				required: true,
+			},
+			{
+				name: "sessionData",
+				type: "Object",
+				description: "Session data, including what this run saved",
+				required: true,
+			},
+		],
+		returnType: {
+			type: "boolean",
+			description: "true when the node stops repeating",
+		},
+		description:
+			"Decides whether a repeating node has reached its exit condition",
+		timeout: 3000,
+		defaultBody: `  return true;`,
+		template: (body: string) => `function exit(payload, sessionData) {
 ${body}
 }`,
 	},
