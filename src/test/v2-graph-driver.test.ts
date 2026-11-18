@@ -9,6 +9,7 @@ import {
 	planV2,
 	receiveV2,
 	runUntilV2,
+	settleV2,
 	stepV2,
 	triggerV2,
 	type GraphNodeV2,
@@ -636,6 +637,109 @@ describe("graph run driver", () => {
 		const step = await stepV2(executor, state, null);
 		expect(step.run?.nodeId).toBe("on_search");
 		expect((step.run?.event?.payload as any).context.message_id).toBe(searchId);
+	});
+
+	it("settles past the journey's skips and decisions without sending", async () => {
+		const graphFor = (decide: string): ProtocolGraphV2 => ({
+			nodes: [
+				{
+					id: "who",
+					api: "decision",
+					owner: "BPP",
+					kind: "decision",
+					start: true,
+					cases: ["known", "unknown"],
+					code: { decide: b64(`function decide(s) { return ${decide}; }`) },
+				},
+				apiNode("note", "on_status", { kind: "unsolicited", optional: true }),
+				apiNode("search", "search"),
+				apiNode("on_search", "on_search", { responseFor: "search" }),
+			],
+			edges: [
+				{ id: "a", from: "who", to: "note", kind: "branch", case: "known" },
+				{
+					id: "b",
+					from: "who",
+					to: "on_search",
+					kind: "branch",
+					case: "unknown",
+				},
+				{ id: "c", from: "note", to: "search", kind: "next" },
+				{ id: "d", from: "search", to: "on_search", kind: "response" },
+			],
+		});
+		const journey: JourneyV2 = {
+			...happy,
+			entry: "who",
+			skips: ["note"],
+			expects: { who: "known" },
+		};
+		const executor = new GraphExecutorV2(graphFor(`"known"`), options);
+		const start = createGraphRunV2(executor, { journey });
+
+		// The mock is the BPP: past the decision and the skip, it awaits the
+		// participant's search, so the participant opens this journey.
+		const bpp = await settleV2(executor, start, journey, { plays: "BPP" });
+		expect(bpp.steps.map((s) => [s.plan.kind, s.outcome])).toEqual([
+			["run", "ran"],
+			["skip", "ran"],
+		]);
+		expect(bpp.state.runs.map((r) => r.nodeId)).toEqual(["who", "note"]);
+		expect(bpp.plan).toMatchObject({ kind: "await", node: { id: "search" } });
+		expect(bpp.limited).toBe(false);
+		// Nothing was sent: a decision event and a skip, no payload.
+		expect(bpp.state.session.events.map((e) => e.payload)).toEqual([
+			{ case: "known" },
+			null,
+		]);
+
+		// The mock is the BAP: it stops before its own search, without running it.
+		const bap = await settleV2(executor, start, journey, { plays: "BAP" });
+		expect(bap.state.runs.map((r) => r.nodeId)).toEqual(["who", "note"]);
+		expect(bap.plan).toMatchObject({ kind: "run", node: { id: "search" } });
+
+		// Already settled: nothing to do.
+		const again = await settleV2(executor, bap.state, journey, {
+			plays: "BAP",
+		});
+		expect(again.steps).toEqual([]);
+		expect(again.state).toBe(bap.state);
+
+		// `limit` stops it early.
+		const limited = await settleV2(executor, start, journey, { limit: 1 });
+		expect(limited.steps).toHaveLength(1);
+		expect(limited.limited).toBe(true);
+		expect(limited.plan).toMatchObject({ kind: "skip", node: { id: "note" } });
+
+		// A decide that leads nowhere stops it: the run fails.
+		const unwired = new GraphExecutorV2(graphFor(`"elsewhere"`), options);
+		const failed = await settleV2(
+			unwired,
+			createGraphRunV2(unwired, { journey }),
+			journey,
+			{ plays: "BPP" },
+		);
+		expect(failed.steps.map((s) => s.outcome)).toEqual(["failed"]);
+		expect(failed.state.failure).toMatchObject({
+			nodeId: "who",
+			cause: "no-wire",
+		});
+		expect(failed.plan).toEqual({ kind: "stopped", reason: "failure" });
+
+		// So does a decision that deviates from the journey.
+		const deviates = new GraphExecutorV2(graphFor(`"unknown"`), options);
+		const deviated = await settleV2(
+			deviates,
+			createGraphRunV2(deviates, { journey }),
+			journey,
+			{ plays: "BPP" },
+		);
+		expect(deviated.steps.map((s) => s.outcome)).toEqual(["failed"]);
+		expect(deviated.state.deviation).toMatchObject({
+			nodeId: "who",
+			actual: "unknown",
+		});
+		expect(deviated.plan).toEqual({ kind: "stopped", reason: "deviation" });
 	});
 
 	it("finishes only at an end-marked node", async () => {

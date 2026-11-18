@@ -495,6 +495,45 @@ export const runUntilV2 = async (
 	return { state: current, steps, limited: true };
 };
 
+/**
+ * Moves a run past the steps nobody sends: the journey's skips and the
+ * decisions, which are decided, not sent. Stops at the first plan that is
+ * anything else (a node to send or await, inputs, a form, a fork, the end),
+ * at the first step that doesn't run (a failing decide, a deviation), or
+ * after `limit` steps (`limited`). Never sends anything, so a host can call
+ * it to learn who opens a journey that starts with a decision. `plan` is
+ * what the run does next, after settling.
+ *
+ * @experimental
+ */
+export const settleV2 = async (
+	executor: GraphExecutorV2,
+	state: GraphRunStateV2,
+	journey: JourneyV2 | null | undefined,
+	{ plays = "both", limit = 50 }: { plays?: PlaysV2; limit?: number } = {},
+): Promise<{
+	state: GraphRunStateV2;
+	steps: DriverStepV2[];
+	plan: GraphPlanV2;
+	limited: boolean;
+}> => {
+	const settles = (plan: GraphPlanV2) =>
+		plan.kind === "skip" ||
+		(plan.kind === "run" && plan.node.kind === "decision");
+	const steps: DriverStepV2[] = [];
+	let current = state;
+	let plan = planV2(executor, current, journey, plays);
+	for (let i = 0; i < limit && settles(plan); i += 1) {
+		const step = await stepV2(executor, current, journey, { plays });
+		steps.push(step);
+		current = step.state;
+		plan = planV2(executor, current, journey, plays);
+		if (step.outcome !== "ran")
+			return { state: current, steps, plan, limited: false };
+	}
+	return { state: current, steps, plan, limited: settles(plan) };
+};
+
 /** Skips the next node, if it is optional (the tester's choice, not the journey's). @experimental */
 export const skipNextV2 = (
 	executor: GraphExecutorV2,
