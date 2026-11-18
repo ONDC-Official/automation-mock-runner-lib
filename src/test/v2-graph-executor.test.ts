@@ -398,6 +398,132 @@ describe("GraphExecutorV2", () => {
 		expect(next.reason).toMatch(/decided "a", which has no wire/);
 	});
 
+	it("blocks on a failing meetsRequirements when asked: a callback answers with v1's error payload", async () => {
+		const requirements = (body: string) =>
+			b64(`function meetsRequirements(sessionData) { ${body} }`);
+		const notMet = requirements(
+			`return { valid: false, code: 412, description: "no stock" };`,
+		);
+		const graph: ProtocolGraphV2 = {
+			nodes: [
+				apiNode("select", "select"),
+				apiNode("on_select", "on_select", {
+					responseFor: "select",
+					code: { generate: template("generate"), requirements: notMet },
+				}),
+				apiNode("init", "init", {
+					code: { generate: template("generate"), requirements: notMet },
+				}),
+			],
+			edges: [
+				{ id: "a", from: "select", to: "on_select", kind: "response" },
+				{ id: "b", from: "on_select", to: "init", kind: "next" },
+			],
+		};
+		const executor = new GraphExecutorV2(graph, options);
+		let session = executor.createSession({ mode: "open" });
+		session = (await executor.runStep(session, "select")).session;
+		const afterSelect = session;
+		const selectId = session.events[0].messageId;
+
+		// The default records the verdict and generates anyway, as before.
+		const recorded = await executor.runStep(session, "on_select");
+		expect(recorded.run.ok).toBe(true);
+		expect(recorded.run.requirements?.result).toMatchObject({ valid: false });
+		expect(recorded.run.generate?.success).toBe(true);
+		expect(recorded.run.requirementsFailed).toBeUndefined();
+
+		const blocked = await executor.runStep(session, "on_select", {
+			requirements: "block",
+		});
+		expect(blocked.run.ok).toBe(false);
+		expect(blocked.run.requirementsFailed).toBe(true);
+		expect(blocked.run.generate).toBeUndefined();
+		expect(blocked.run.validate).toBeUndefined();
+		expect(blocked.run.error).toMatch(
+			/requirements not met: no stock · answered with REQUIREMENTS_NOT_MET/,
+		);
+		expect(blocked.run.event).toMatchObject({
+			nodeId: "on_select",
+			api: "on_select",
+			direction: "out",
+			messageId: selectId,
+			status: "ERROR",
+			saved: {},
+		});
+		const longDesc = "code=412 description=no stock";
+		expect(blocked.run.event?.payload).toEqual({
+			context: expect.objectContaining({
+				action: "on_select",
+				transaction_id: "tx-fixed",
+				message_id: selectId,
+				bpp_id: "bpp.example.com",
+			}),
+			error: {
+				code: "REQUIREMENTS_NOT_MET",
+				message: "no stock",
+				paths: longDesc,
+				tags: [{ descriptor: { short_desc: "no stock", long_desc: longDesc } }],
+			},
+		});
+		// Recorded as the callback's event; it saved nothing.
+		expect(blocked.session.events.at(-1)).toBe(blocked.run.event);
+		expect(executor.getSessionData(blocked.session)).toEqual(
+			executor.getSessionData(session),
+		);
+
+		// skipRequirements never runs the check.
+		const skipped = await executor.runStep(session, "on_select", {
+			requirements: "block",
+			skipRequirements: true,
+		});
+		expect(skipped.run.ok).toBe(true);
+		expect(skipped.run.requirements).toBeUndefined();
+
+		// A request sends nothing: there is no error payload to answer with.
+		session = recorded.session;
+		const request = await executor.runStep(session, "init", {
+			requirements: "block",
+		});
+		expect(request.run.ok).toBe(false);
+		expect(request.run.requirementsFailed).toBe(true);
+		expect(request.run.error).toMatch(/nothing sent/);
+		expect(request.run.event).toBeUndefined();
+		expect(request.session).toBe(session);
+
+		// A check that fails to run is v1's REQUIREMENTS_CHECK_ERROR.
+		const throwing = new GraphExecutorV2(
+			{
+				...graph,
+				nodes: graph.nodes.map((n) =>
+					n.id === "on_select"
+						? {
+								...n,
+								code: {
+									...n.code,
+									requirements: requirements(`throw new Error("boom");`),
+								},
+							}
+						: n,
+				),
+			},
+			options,
+		);
+		const errored = await throwing.runStep(afterSelect, "on_select", {
+			requirements: "block",
+		});
+		expect(errored.run.requirementsFailed).toBe(true);
+		const error = (errored.run.event?.payload as any).error;
+		expect(error.code).toBe("REQUIREMENTS_CHECK_ERROR");
+		expect(error.message).toBe(
+			"[MOCK PAYLOAD GENERATION ERROR] PLEASE CONTACT TECH SUPPORT",
+		);
+		expect(errored.run.requirements?.success).toBe(false);
+		expect(error.tags[0].descriptor.short_desc).toBe(
+			errored.run.requirements?.error?.message,
+		);
+	});
+
 	it("fails a step whose generate returns no payload, naming what it logged", async () => {
 		// The pattern that hid a missing helper in Studio live: the error is caught and
 		// logged, nothing is returned, and saveData later failed on an empty payload.

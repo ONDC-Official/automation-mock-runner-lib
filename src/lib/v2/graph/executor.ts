@@ -59,6 +59,44 @@ const getLatestMainEventOfV2 = (
 	return undefined;
 };
 
+/**
+ * v1's verdict on a `meetsRequirements` result, as its mock answers one
+ * (`build-error-payload.ts` / `generate-response.ts` in the mock service):
+ * null when the step may go on.
+ */
+const requirementsErrorV2 = (
+	result: ExecutionResult,
+): {
+	code: "REQUIREMENTS_NOT_MET" | "REQUIREMENTS_CHECK_ERROR";
+	message: string;
+	shortDesc: string;
+	longDesc: string;
+} | null => {
+	if (!result.success) {
+		return {
+			code: "REQUIREMENTS_CHECK_ERROR",
+			message: "[MOCK PAYLOAD GENERATION ERROR] PLEASE CONTACT TECH SUPPORT",
+			shortDesc: result.error?.message ?? "Requirements check failed",
+			longDesc: result.error?.stack ?? "Stack trace not available",
+		};
+	}
+	const verdict = result.result as
+		| { valid?: unknown; code?: unknown; description?: unknown }
+		| null
+		| undefined;
+	if (verdict?.valid !== false) return null;
+	const description =
+		verdict.description === undefined || verdict.description === null
+			? undefined
+			: String(verdict.description);
+	return {
+		code: "REQUIREMENTS_NOT_MET",
+		message: description ?? "Requirements not met",
+		shortDesc: description ?? "Requirements not met",
+		longDesc: `code=${verdict.code ?? "N/A"} description=${description ?? "N/A"}`,
+	};
+};
+
 const failed = (name: string, message: string): ExecutionResult => ({
 	timestamp: new Date().toISOString(),
 	success: false,
@@ -404,13 +442,20 @@ export class GraphExecutorV2 {
 	/**
 	 * Runs one node and appends its event. `ok` is false when nothing could be
 	 * produced (generate failed, decide returned a case no wire leads out on,
-	 * no form data); a failing `meetsRequirements` or `validate` is recorded,
-	 * not blocking.
+	 * no form data); a failing `validate` is recorded, not blocking, and so is
+	 * a failing `meetsRequirements` unless `requirements: "block"` (then see
+	 * `StepRunV2.requirementsFailed`).
 	 */
 	public async runStep(
 		session: GraphSessionV2,
 		nodeId: string,
-		{ inputs, formData, skipRequirements, extra }: RunStepOptionsV2 = {},
+		{
+			inputs,
+			formData,
+			skipRequirements,
+			requirements = "record",
+			extra,
+		}: RunStepOptionsV2 = {},
 	): Promise<{ run: StepRunV2; session: GraphSessionV2 }> {
 		const node = this.index.byId.get(nodeId);
 		if (!node) {
@@ -449,6 +494,15 @@ export class GraphExecutorV2 {
 				decodeOr(code.requirements, ""),
 				[sessionData],
 			);
+			const blocked =
+				requirements === "block" ? requirementsErrorV2(run.requirements) : null;
+			if (blocked) {
+				return this.blockOnRequirements(session, node, sessionData, run, {
+					...blocked,
+					inputs,
+					extra: isExtra,
+				});
+			}
 		}
 
 		// generate: context rebuilt for this run, helpers prepended as in v1.
@@ -547,6 +601,67 @@ export class GraphExecutorV2 {
 		run.event = event;
 		run.ok = true;
 		return { run, session: this.append(session, node, event, isExtra) };
+	}
+
+	/**
+	 * `meetsRequirements` said no under `requirements: "block"`: nothing is
+	 * generated. A callback answers its request with v1's error payload
+	 * (paired message_id, context as `generate` would get it), recorded as an
+	 * `ERROR` event that saves nothing; a request sends nothing, since a
+	 * `{ context, error }` request would only be NACKed.
+	 */
+	private blockOnRequirements(
+		session: GraphSessionV2,
+		node: GraphNodeV2,
+		sessionData: Record<string, unknown>,
+		run: StepRunV2,
+		{
+			code,
+			message,
+			shortDesc,
+			longDesc,
+			inputs,
+			extra,
+		}: NonNullable<ReturnType<typeof requirementsErrorV2>> & {
+			inputs?: unknown;
+			extra: boolean;
+		},
+	): { run: StepRunV2; session: GraphSessionV2 } {
+		run.requirementsFailed = true;
+		run.error = `${
+			code === "REQUIREMENTS_NOT_MET"
+				? "requirements not met"
+				: "meetsRequirements failed"
+		}: ${shortDesc} · ${
+			node.responseFor
+				? `answered with ${code}`
+				: "nothing sent (a request is not answered with an error)"
+		}`;
+		if (!node.responseFor) return { run, session };
+		const messageId = this.messageIdFor(node, session, sessionData, extra);
+		const payload = {
+			context: buildContextV2({
+				domain: this.options.domain,
+				version: this.options.version,
+				action: node.api,
+				transactionId: session.transactionId,
+				messageId,
+				sessionData,
+				transactionData: this.options.transactionData,
+			}),
+			error: {
+				code,
+				message,
+				paths: longDesc,
+				tags: [{ descriptor: { short_desc: shortDesc, long_desc: longDesc } }],
+			},
+		};
+		const event: GraphEventV2 = {
+			...this.makeEvent(node, { payload, messageId, inputs, saved: {}, extra }),
+			status: "ERROR",
+		};
+		run.event = event;
+		return { run, session: this.append(session, node, event, extra) };
 	}
 
 	/**

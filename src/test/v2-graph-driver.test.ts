@@ -166,6 +166,166 @@ describe("graph run driver", () => {
 		});
 	});
 
+	it("blocks on requirements when playing one side: a callback answers with v1's error, a request sends nothing", async () => {
+		const notMet = b64(
+			`function meetsRequirements(sessionData) { return { valid: false, code: 412, description: "no stock" }; }`,
+		);
+		const blocking = { generate: template("generate"), requirements: notMet };
+		const graph: ProtocolGraphV2 = {
+			nodes: [
+				apiNode("search", "search"),
+				apiNode("on_search", "on_search", {
+					responseFor: "search",
+					code: blocking,
+				}),
+				apiNode("select", "select", { code: blocking }),
+				apiNode("status", "status", { kind: "on_demand", code: blocking }),
+			],
+			edges: [
+				{ id: "a", from: "search", to: "on_search", kind: "response" },
+				{ id: "b", from: "on_search", to: "select", kind: "next" },
+			],
+		};
+		const executor = new GraphExecutorV2(graph, options);
+
+		// The mock is the BPP: the participant's search arrives, on_search is blocked.
+		const received = await receiveV2(
+			executor,
+			createGraphRunV2(executor, { journey: happy }),
+			happy,
+			incoming("search", "m-search"),
+			{ plays: "BPP" },
+		);
+		const step = await stepV2(executor, received.state, happy, {
+			plays: "BPP",
+		});
+		expect(step.outcome).toBe("failed");
+		expect(step.run?.requirementsFailed).toBe(true);
+		expect(step.run?.generate).toBeUndefined();
+		// The host sends this event's payload: v1's error, answering the search.
+		expect(step.run?.event).toMatchObject({
+			direction: "out",
+			status: "ERROR",
+			messageId: "m-search",
+		});
+		const payload = step.run?.event?.payload as any;
+		expect(payload.error.code).toBe("REQUIREMENTS_NOT_MET");
+		expect(payload.context).toMatchObject({
+			action: "on_search",
+			message_id: "m-search",
+		});
+		expect(step.state.failure).toEqual({
+			nodeId: "on_search",
+			reason: expect.stringMatching(/requirements not met: no stock/),
+			cause: "requirements",
+		});
+		expect(step.logs).toEqual([expect.objectContaining({ level: "error" })]);
+		expect(planV2(executor, step.state, happy, "BPP")).toEqual({
+			kind: "stopped",
+			reason: "failure",
+		});
+		expect(getRunStatusV2(executor, step.state, happy, "BPP").on_search).toBe(
+			"failed",
+		);
+
+		// skipRequirements (v1's SKIP_MEETS_REQUIRMENTS) never runs the check.
+		const skipped = await stepV2(executor, received.state, happy, {
+			plays: "BPP",
+			skipRequirements: true,
+		});
+		expect(skipped.outcome).toBe("ran");
+		expect(skipped.run?.requirements).toBeUndefined();
+		// `record` can be asked for explicitly on one side too.
+		const recorded = await stepV2(executor, received.state, happy, {
+			plays: "BPP",
+			requirements: "record",
+		});
+		expect(recorded.outcome).toBe("ran");
+		expect(recorded.state.failure).toBeNull();
+
+		// The mock is the BAP and its own request is blocked: nothing to send.
+		let bap = (
+			await stepV2(
+				executor,
+				createGraphRunV2(executor, { journey: happy }),
+				happy,
+				{
+					plays: "BAP",
+				},
+			)
+		).state;
+		bap = (
+			await receiveV2(
+				executor,
+				bap,
+				happy,
+				incoming("on_search", bap.session.events[0].messageId),
+				{ plays: "BAP" },
+			)
+		).state;
+		const select = await stepV2(executor, bap, happy, { plays: "BAP" });
+		expect(select.outcome).toBe("failed");
+		expect(select.run?.requirementsFailed).toBe(true);
+		expect(select.run?.event).toBeUndefined();
+		expect(select.state.session).toBe(bap.session);
+		expect(select.state.failure).toMatchObject({
+			nodeId: "select",
+			cause: "requirements",
+		});
+
+		// A blocked trigger fails only itself, not the run it isn't part of.
+		const trigger = await triggerV2(executor, bap, "status", undefined, {
+			plays: "BAP",
+		});
+		expect(trigger.run?.requirementsFailed).toBe(true);
+		expect(trigger.state.failure).toBeNull();
+		expect(trigger.logs[0].level).toBe("error");
+		const forced = await triggerV2(executor, bap, "status", undefined, {
+			plays: "BAP",
+			skipRequirements: true,
+		});
+		expect(forced.run?.ok).toBe(true);
+	});
+
+	it("records a failing meetsRequirements in the simulation and warns", async () => {
+		const graph: ProtocolGraphV2 = {
+			nodes: linear.nodes.map((n) =>
+				n.id === "on_search"
+					? {
+							...n,
+							code: {
+								...n.code,
+								requirements: b64(
+									`function meetsRequirements(sessionData) { return { valid: false, code: 412, description: "no stock" }; }`,
+								),
+							},
+						}
+					: n,
+			),
+			edges: linear.edges,
+		};
+		const executor = new GraphExecutorV2(graph, options);
+		const out = await runUntilV2(
+			executor,
+			createGraphRunV2(executor, { journey: happy }),
+			happy,
+		);
+		expect(out.state.runs.map((r) => r.nodeId)).toEqual([
+			"search",
+			"on_search",
+			"select",
+			"on_select",
+		]);
+		expect(out.state.failure).toBeNull();
+		expect(out.steps[1].logs).toEqual([
+			{
+				level: "warn",
+				message:
+					"on_search: sent · requirements not met (no stock) · generated anyway; a live run answers REQUIREMENTS_NOT_MET here instead",
+			},
+		]);
+	});
+
 	it("refuses a payload the host plays, an unexpected one, and after a stop", async () => {
 		const executor = new GraphExecutorV2(linear, options);
 		let state = createGraphRunV2(executor, { journey: happy });

@@ -279,6 +279,14 @@ export interface StepRunV2 {
 	error?: string;
 	/** An optional node passed over with `skip`: nothing ran. */
 	skipped?: boolean;
+	/**
+	 * Run with `requirements: "block"`: `meetsRequirements` returned
+	 * `valid: false` or failed to run, so `generate` was skipped and `ok` is
+	 * false. For a callback (`responseFor` set), `event` is v1's error payload
+	 * (`{ context, error }`, `status: "ERROR"`) for the host to send; a
+	 * request has no event.
+	 */
+	requirementsFailed?: boolean;
 }
 
 /** One candidate's verdict in `recognise`. @experimental */
@@ -324,6 +332,19 @@ export interface GraphExecutorOptionsV2 {
 	externalSessionData?: Record<string, unknown>;
 }
 
+/**
+ * What a failing `meetsRequirements` does to a step.
+ * - `record`: the result is recorded and `generate` runs anyway (the
+ *   simulation's behaviour).
+ * - `block`: as v1's mock does, `generate` is skipped. A callback answers
+ *   with v1's error payload instead — `REQUIREMENTS_NOT_MET` when it returned
+ *   `valid: false`, `REQUIREMENTS_CHECK_ERROR` when it failed to run; a
+ *   request sends nothing (`StepRunV2.requirementsFailed`).
+ *
+ * @experimental
+ */
+export type RequirementsModeV2 = "record" | "block";
+
 /** @experimental */
 export interface RunStepOptionsV2 {
 	/** Tester inputs for this step: become `sessionData.user_inputs`. */
@@ -332,6 +353,8 @@ export interface RunStepOptionsV2 {
 	formData?: unknown;
 	/** Skip `meetsRequirements` (a retry after it said no). */
 	skipRequirements?: boolean;
+	/** What a failing `meetsRequirements` does. Default `record`. */
+	requirements?: RequirementsModeV2;
 	/** An on-demand / re-triggered run: recorded, but not a main-path step. */
 	extra?: boolean;
 }

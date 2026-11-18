@@ -1,3 +1,4 @@
+import type { ExecutionResult } from "../../types/execution-results";
 import type { GraphExecutorV2 } from "./executor";
 import type {
 	ForkV2,
@@ -6,6 +7,7 @@ import type {
 	GraphSessionV2,
 	JourneyV2,
 	RecogniseResultV2,
+	RequirementsModeV2,
 	RunFailureCauseV2,
 	StepRunV2,
 } from "./types";
@@ -125,7 +127,50 @@ export interface DriverOptionsV2 {
 	 * this step had it arrived from a counterparty? Default: when playing both.
 	 */
 	recognise?: boolean;
+	/** Don't run `meetsRequirements` at all (v1's `SKIP_MEETS_REQUIRMENTS`). */
+	skipRequirements?: boolean;
+	/**
+	 * What a failing `meetsRequirements` does. Default: `block` when playing
+	 * one side (a live run, as v1's mock does), `record` when playing both
+	 * (the simulation warns and generates anyway). Under `block` the step
+	 * fails with cause `requirements`; a callback's `run.event` is then the
+	 * error payload for the host to send.
+	 */
+	requirements?: RequirementsModeV2;
 }
+
+/** The requirements mode a run uses: `options.requirements`, else by `plays`. */
+const requirementsModeOf = (
+	plays: PlaysV2,
+	requirements?: RequirementsModeV2,
+): RequirementsModeV2 =>
+	requirements ?? (plays === "both" ? "record" : "block");
+
+/** A recorded (not blocking) `meetsRequirements` that said no, in words; null when it passed. */
+const describeRequirements = (
+	node: GraphNodeV2,
+	result: ExecutionResult | undefined,
+): string | null => {
+	if (!result) return null;
+	const live = (code: string) =>
+		node.responseFor
+			? `a live run answers ${code} here instead`
+			: "a live run stops here";
+	if (!result.success)
+		return `meetsRequirements failed (${result.error?.message ?? "error"}) · ${live("REQUIREMENTS_CHECK_ERROR")}`;
+	const verdict = result.result as
+		| { valid?: unknown; description?: unknown }
+		| null
+		| undefined;
+	if (verdict?.valid === true) return null;
+	if (verdict?.valid === false)
+		return `requirements not met${
+			typeof verdict.description === "string" && verdict.description
+				? ` (${verdict.description})`
+				: ""
+		} · generated anyway; ${live("REQUIREMENTS_NOT_MET")}`;
+	return "meetsRequirements returned no { valid } verdict";
+};
 
 /** A node whose step asks the tester for inputs before it runs. @experimental */
 export const hasInputsV2 = (node: GraphNodeV2): boolean => {
@@ -323,6 +368,8 @@ export const stepV2 = async (
 	const out = await executor.runStep(state.session, node.id, {
 		...(inputs !== undefined ? { inputs } : {}),
 		...(formData !== undefined ? { formData } : {}),
+		...(options.skipRequirements ? { skipRequirements: true } : {}),
+		requirements: requirementsModeOf(plays, options.requirements),
 	});
 	let recognition: RecogniseResultV2 | undefined;
 	const replay = options.recognise ?? plays === "both";
@@ -358,6 +405,20 @@ export const stepV2 = async (
 			return done("failed", next, out.run);
 		}
 	}
+	if (out.run.requirementsFailed) {
+		// Blocked: the run stops here. A callback's error payload is in
+		// `run.event` for the host to send; a request sent nothing.
+		const reason = out.run.error ?? "requirements not met";
+		logs.push({ level: "error", message: `${node.id}: ${reason}` });
+		return done(
+			"failed",
+			{
+				...next,
+				failure: { nodeId: node.id, reason, cause: "requirements" },
+			},
+			out.run,
+		);
+	}
 	if (!out.run.ok) {
 		logs.push({
 			level: "error",
@@ -381,10 +442,7 @@ export const stepV2 = async (
 		return done("failed", next, out.run);
 	}
 	const checks = [
-		out.run.requirements &&
-		!(out.run.requirements.result as { valid?: boolean })?.valid
-			? "requirements failed"
-			: null,
+		describeRequirements(node, out.run.requirements),
 		out.run.validate && !(out.run.validate.result as { valid?: boolean })?.valid
 			? "validate failed"
 			: null,
@@ -476,7 +534,10 @@ export const chooseV2 = (
 
 /**
  * Runs an on-demand node without moving the main path. A node with inputs and
- * none given comes back as an `inputs` plan (submit to run it).
+ * none given comes back as an `inputs` plan (submit to run it). `options`
+ * work as for `stepV2` (`plays` only picks the default `requirements` mode);
+ * a blocked trigger doesn't fail the run, which it is not part of, but a
+ * callback's error payload is in `run.event` all the same.
  *
  * @experimental
  */
@@ -485,6 +546,10 @@ export const triggerV2 = async (
 	state: GraphRunStateV2,
 	nodeId: string,
 	inputs?: Record<string, unknown>,
+	options: Pick<
+		DriverOptionsV2,
+		"plays" | "skipRequirements" | "requirements"
+	> = {},
 ): Promise<{
 	state: GraphRunStateV2;
 	pending?: GraphPlanV2;
@@ -513,14 +578,24 @@ export const triggerV2 = async (
 	const out = await executor.runStep(state.session, nodeId, {
 		extra: true,
 		...(inputs !== undefined ? { inputs } : {}),
+		...(options.skipRequirements ? { skipRequirements: true } : {}),
+		requirements: requirementsModeOf(
+			options.plays ?? "both",
+			options.requirements,
+		),
 	});
+	const warning = out.run.ok
+		? describeRequirements(node, out.run.requirements)
+		: null;
 	return {
 		state: withRun(state, out.session, out.run),
 		run: out.run,
 		logs: [
 			{
-				level: out.run.ok ? "success" : "error",
-				message: `${nodeId} (on demand): ${out.run.ok ? "sent" : out.run.error}`,
+				level: out.run.ok ? (warning ? "warn" : "success") : "error",
+				message: `${nodeId} (on demand): ${
+					out.run.ok ? `sent${warning ? ` · ${warning}` : ""}` : out.run.error
+				}`,
 			},
 		],
 	};
