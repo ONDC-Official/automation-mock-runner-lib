@@ -377,6 +377,59 @@ describe("graph run driver", () => {
 		expect(JSON.parse(JSON.stringify(repeated.state)).failure.cause).toBe(
 			"repeat",
 		);
+
+		// no-wire: decide returned a case nothing is wired for. The run stops
+		// (it used to sit on the same plan, so no host heard of it).
+		const unwired = loop(
+			{ start: true },
+			`function decide(s) { return "elsewhere"; }`,
+		);
+		const stuck = await runUntilV2(
+			unwired,
+			createGraphRunV2(unwired, {}),
+			null,
+		);
+		expect(stuck.steps.at(-1)).toMatchObject({
+			outcome: "failed",
+			plan: { kind: "run", node: { id: "again" } },
+		});
+		expect(stuck.state.failure).toMatchObject({
+			nodeId: "again",
+			cause: "no-wire",
+		});
+		expect(stuck.state.failure?.reason).toMatch(/expected one of again/);
+		expect(planV2(unwired, stuck.state, null)).toEqual({
+			kind: "stopped",
+			reason: "failure",
+		});
+		expect(getRunStatusV2(unwired, stuck.state, null).again).toBe("failed");
+
+		// A stored decision whose wire is gone: the plan fails with no-wire.
+		const decided = await runUntilV2(
+			repeat,
+			createGraphRunV2(repeat, {}),
+			null,
+			{ limit: 2 },
+		);
+		const rewired = new GraphExecutorV2(
+			{ ...repeat.graph, edges: repeat.graph.edges.filter((e) => !e.case) },
+			options,
+		);
+		expect(planV2(rewired, decided.state, null)).toMatchObject({
+			kind: "failed",
+			nodeId: "again",
+			cause: "no-wire",
+		});
+
+		// A decide that fails to run stops the run too, with no cause.
+		const broken = loop(
+			{ start: true },
+			`function decide(s) { throw new Error("boom"); }`,
+		);
+		const threw = await runUntilV2(broken, createGraphRunV2(broken, {}), null);
+		expect(threw.state.failure?.nodeId).toBe("again");
+		expect(threw.state.failure?.reason).toMatch(/boom/);
+		expect(threw.state.failure?.cause).toBeUndefined();
 	});
 
 	it("triggers on-demand nodes off the main path, asking for inputs first", async () => {

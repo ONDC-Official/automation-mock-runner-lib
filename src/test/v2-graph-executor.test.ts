@@ -344,6 +344,60 @@ describe("GraphExecutorV2", () => {
 		expect(run.error).toMatch(/expected one of a/);
 	});
 
+	it("refuses a decided case that no wire leads out on", async () => {
+		const decision = (decide: string, patch: Partial<GraphNodeV2> = {}) => ({
+			id: "sw",
+			api: "decision",
+			owner: "BPP" as const,
+			kind: "decision" as const,
+			code: { decide: b64(`function decide(s) { return ${decide}; }`) },
+			...patch,
+		});
+		const wired: ProtocolGraphV2 = {
+			nodes: [decision(`"b"`, { cases: ["a", "b"] }), apiNode("x", "search")],
+			edges: [{ id: "e", from: "sw", to: "x", kind: "branch", case: "a" }],
+		};
+		// "b" is a declared case, but only "a" is wired: the wires decide.
+		const executor = new GraphExecutorV2(wired, options);
+		const session = executor.createSession({ mode: "open" });
+		const declared = await executor.runStep(session, "sw");
+		expect(declared.run.ok).toBe(false);
+		expect(declared.run.error).toBe(`decide returned "b"; expected one of a`);
+		expect(declared.session).toBe(session);
+
+		// `cases: []` and no wires accepts nothing (it used to accept anything).
+		const empty = new GraphExecutorV2(
+			{ nodes: [decision(`"anything"`, { cases: [] })], edges: [] },
+			options,
+		);
+		const none = await empty.runStep(
+			empty.createSession({ mode: "open" }),
+			"sw",
+		);
+		expect(none.run.ok).toBe(false);
+		expect(none.run.error).toMatch(/no case of "sw" is wired/);
+
+		// A decision without wires still takes its declared cases.
+		const unwired = new GraphExecutorV2(
+			{ nodes: [decision(`"a"`, { cases: ["a"] })], edges: [] },
+			options,
+		);
+		const ran = await unwired.runStep(
+			unwired.createSession({ mode: "open" }),
+			"sw",
+		);
+		expect(ran.run.ok).toBe(true);
+		// ...but next can't follow it: the run fails rather than ending quietly.
+		const next = unwired.next(ran.session, null);
+		expect(next).toMatchObject({
+			auto: null,
+			end: true,
+			failed: true,
+			cause: "no-wire",
+		});
+		expect(next.reason).toMatch(/decided "a", which has no wire/);
+	});
+
 	it("fails a step whose generate returns no payload, naming what it logged", async () => {
 		// The pattern that hid a missing helper in Studio live: the error is caught and
 		// logged, nothing is returned, and saveData later failed on an empty payload.

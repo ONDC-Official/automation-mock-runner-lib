@@ -176,9 +176,13 @@ export const nextStepsV2 = (
 	// fails the run, as a repeat-until node's limit does.
 	if (from.kind === "decision") {
 		const wire = wires.find((edge) => edge.case === last.case);
+		// `runStep` refuses such a case; a stored session can still hold one
+		// (the graph lost the wire since).
 		if (!wire) {
 			return done({
-				end: wires.length === 0,
+				end: true,
+				failed: true,
+				cause: "no-wire",
 				reason: `Decision "${from.id}" decided "${last.case ?? ""}", which has no wire`,
 			});
 		}

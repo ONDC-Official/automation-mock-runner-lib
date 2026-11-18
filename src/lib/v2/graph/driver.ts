@@ -363,6 +363,21 @@ export const stepV2 = async (
 			level: "error",
 			message: `${node.id}: ${out.run.error ?? "failed"}`,
 		});
+		// A decision that can't be followed stops the run: stepping again would
+		// decide the same way on the same session data, and a host that only
+		// watches `failure` (the mock, the live page) would never hear of it.
+		// `no-wire` when decide returned a case nothing is wired for; no cause
+		// when decide itself failed to run.
+		if (node.kind === "decision") {
+			next = {
+				...next,
+				failure: {
+					nodeId: node.id,
+					reason: out.run.error ?? "decide failed",
+					...(out.run.decide?.success ? { cause: "no-wire" as const } : {}),
+				},
+			};
+		}
 		return done("failed", next, out.run);
 	}
 	const checks = [

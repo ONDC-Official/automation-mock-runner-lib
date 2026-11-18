@@ -85,7 +85,10 @@ export interface GraphNodeV2 {
 	saveData?: Record<string, string>;
 	/** A form node's HTML, base64. */
 	formHtml?: string;
-	/** A decision node's cases: one out wire each. */
+	/**
+	 * A decision node's cases: one out wire each. At run time the wired cases
+	 * are the valid ones; these apply only to a decision with no wires.
+	 */
 	cases?: string[];
 	/** Skipping it is not a deviation: the host may `skip` it instead of running it. */
 	optional?: boolean;
@@ -243,8 +246,9 @@ export interface NextV2 {
 	canEnd?: boolean;
 	/**
 	 * The run cannot go on correctly: a `repeat.until` node ran `max` times
-	 * without exiting, or a decision chose a node that has run its `repeat.max`.
-	 * `reason` says why, `cause` which rule it was.
+	 * without exiting, a decision chose a node that has run its `repeat.max`,
+	 * or a decision's case has no wire. `reason` says why, `cause` which rule
+	 * it was.
 	 */
 	failed?: boolean;
 	/** With `failed`: which rule stopped the run. */

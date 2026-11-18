@@ -403,8 +403,9 @@ export class GraphExecutorV2 {
 
 	/**
 	 * Runs one node and appends its event. `ok` is false when nothing could be
-	 * produced (generate failed, decide returned an unknown case, no form data);
-	 * a failing `meetsRequirements` or `validate` is recorded, not blocking.
+	 * produced (generate failed, decide returned a case no wire leads out on,
+	 * no form data); a failing `meetsRequirements` or `validate` is recorded,
+	 * not blocking.
 	 */
 	public async runStep(
 		session: GraphSessionV2,
@@ -601,16 +602,27 @@ export class GraphExecutorV2 {
 			return { run, session };
 		}
 		const chosen = run.decide.result;
+		// The cases a run can take are the ones wired out (the wires `next`
+		// follows); a decision with no wires falls back to its declared cases.
+		// An empty list accepts nothing: a case that leads nowhere fails here,
+		// not one step later.
+		const wires = (this.index.out.get(node.id) ?? []).filter((edge) => {
+			const target = this.index.byId.get(edge.to);
+			return (
+				!!target && edge.kind !== "on_demand" && target.kind !== "on_demand"
+			);
+		});
 		const cases =
-			node.cases ??
-			(this.index.out.get(node.id) ?? [])
-				.map((edge) => edge.case)
-				.filter(Boolean);
-		if (
-			typeof chosen !== "string" ||
-			(cases.length > 0 && !cases.includes(chosen))
-		) {
-			run.error = `decide returned ${JSON.stringify(chosen)}; expected one of ${cases.join(", ")}`;
+			wires.length > 0
+				? wires
+						.map((edge) => edge.case)
+						.filter((c): c is string => typeof c === "string" && c !== "")
+				: (node.cases ?? []);
+		if (typeof chosen !== "string" || !cases.includes(chosen)) {
+			run.error =
+				cases.length > 0
+					? `decide returned ${JSON.stringify(chosen)}; expected one of ${cases.join(", ")}`
+					: `decide returned ${JSON.stringify(chosen)}, but no case of "${node.id}" is wired`;
 			return { run, session };
 		}
 		const event = this.makeEvent(node, {
